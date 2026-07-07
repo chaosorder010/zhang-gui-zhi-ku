@@ -1,0 +1,160 @@
+<mxfile host="65bd71144e">
+    <diagram id="2w01Pr0ciRrzSci4BrQi" name="第 1 页">
+        <mxGraphModel dx="700" dy="611" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="690" pageHeight="980" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="掌柜智库 - 系统架构图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+                    <mxGeometry x="200" y="10" width="400" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="📥 数据导入管道" style="text;html=1;strokeColor=none;fillColor=#E3F2FD;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontStyle=1;rounded=1;" vertex="1" parent="1">
+                    <mxGeometry x="30" y="60" width="220" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="PDF文档" style="rounded=1;fillColor=#BBDEFB;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="骨架代码" style="rounded=1;fillColor=#BBDEFB;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="155" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="入口节点" style="rounded=1;fillColor=#BBDEFB;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="210" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="PDF→Markdown" style="rounded=1;fillColor=#90CAF9;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="265" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="MD图片处理" style="rounded=1;fillColor=#90CAF9;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="320" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="文档切片" style="rounded=1;fillColor=#64B5F6;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="375" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="主体识别" style="rounded=1;fillColor=#64B5F6;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="430" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="向量化" style="rounded=1;fillColor=#42A5F5;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="485" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="存入 Milvus" style="rounded=1;fillColor=#1E88E5;fontColor=#FFFFFF;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="540" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="4" target="5">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="5" target="6">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="6" target="7">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="7" target="8">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="8" target="9">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="9" target="10">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="10" target="11">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="11" target="12">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="🧠 Milvus&#xa;向量数据库" style="rounded=1;fillColor=#1565C0;fontColor=#FFFFFF;fontSize=12;whiteSpace=wrap;html=1;dashed=1;" vertex="1" parent="1">
+                    <mxGeometry x="210" y="505" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="22" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=1;exitY=0.5;entryX=0;entryY=0.5;dashed=1;" edge="1" parent="1" source="12" target="21">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="🔍 检索与问答管道" style="text;html=1;strokeColor=none;fillColor=#FFF3E0;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontStyle=1;rounded=1;" vertex="1" parent="1">
+                    <mxGeometry x="340" y="60" width="220" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="24" value="用户查询" style="rounded=1;fillColor=#FFE0B2;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="100" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="产品确认" style="rounded=1;fillColor=#FFE0B2;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="155" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="26" value="骨架代码检索" style="rounded=1;fillColor=#FFCC80;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="210" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" value="搜索向量库" style="rounded=1;fillColor=#FFB74D;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="265" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" value="假设性文档搜索" style="rounded=1;fillColor=#FFB74D;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="320" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="29" value="网络搜索" style="rounded=1;fillColor=#FFB74D;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="375" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="30" value="结果融合重排" style="rounded=1;fillColor=#FF9800;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="430" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" value="Rerank 重排" style="rounded=1;fillColor=#F57C00;fontColor=#FFFFFF;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="485" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="📤 答案输出" style="rounded=1;fillColor=#E65100;fontColor=#FFFFFF;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="350" y="540" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="33" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="24" target="25">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="34" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="25" target="26">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="35" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="26" target="27">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="36" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="27" target="28">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="37" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="28" target="29">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="38" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="29" target="30">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="39" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="30" target="31">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="40" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="31" target="32">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="41" value="🌐 Web 服务层" style="text;html=1;strokeColor=none;fillColor=#E8F5E9;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontStyle=1;rounded=1;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="60" width="180" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="42" value="⚙️ 骨架代码&#xa;(Web服务)" style="rounded=1;fillColor=#C8E6C9;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="130" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="43" value="📡 API 接口&#xa;(FastAPI)" style="rounded=1;fillColor=#A5D6A7;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="210" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="44" value="🖥️ 前端页面" style="rounded=1;fillColor=#81C784;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="290" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="45" value="🤖 LLM 调用&#xa;(答案生成)" style="rounded=1;fillColor=#66BB6A;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="610" y="370" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="46" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="42" target="43">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="47" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="43" target="44">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="48" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="44" target="45">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="49" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;endFill=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;strokeColor=#1976D2;" edge="1" parent="1" source="21" target="27">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="50" style="edgeStyle=orthogonalEdgeStyle;endArrow=classic;endFill=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;strokeColor=#E65100;" edge="1" parent="1" source="32" target="45">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="51" value="环境准备：Python 3.10+ · LangChain · Milvus · FastAPI" style="text;html=1;strokeColor=none;fillColor=#F5F5F5;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontStyle=0;rounded=1;" vertex="1" parent="1">
+                    <mxGeometry x="200" y="595" width="400" height="24" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

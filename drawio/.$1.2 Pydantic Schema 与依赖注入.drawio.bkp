@@ -1,0 +1,13 @@
+<mxfile host="Electron">
+  <diagram id="5NRCFf6T-4gHLXbIaInp" name="第 1 页">
+    <mxGraphModel dx="1708" dy="658" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="690" pageHeight="980" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" parent="1" style="text;whiteSpace=wrap;fontSize=14;" value="为什么需要 Schema？&#xa;&#xa;&#xa;  FastAPI 接口需要知道&quot;前端发来什么数据&quot;和&quot;返回什么数据&quot;。如果直接用 dict，就像收快递不检查包裹——你不知道里面装了什么、有没有破损。Pydantic Schema&#xa;  就是数据契约，在数据进入业务逻辑前自动校验和解析。&#xa;&#xa;&#xa;  是什么？&#xa;&#xa;&#xa;  BaseModel 是 Pydantic 的核心类，继承它就定义了一个带类型标注的数据模型。Field(...) 补充元信息（描述、默认值、校验规则）。" vertex="1">
+          <mxGeometry height="280" width="1110" x="-350" y="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

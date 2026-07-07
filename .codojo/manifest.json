@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "installedAt": "2026-07-03T02:13:18.678Z",
+  "source": "/home/leon/projects/codojo",
+  "packageVersion": "0.1.0",
+  "tools": [
+    {
+      "tool": "codex",
+      "label": "Codex",
+      "target": ".codex/skills",
+      "shared": "_shared",
+      "skills": [
+        "dojo-assess",
+        "dojo-hack",
+        "dojo-init",
+        "dojo-notebook",
+        "dojo-plan",
+        "dojo-quiz",
+        "dojo-reset",
+        "dojo-stage",
+        "dojo-teach"
+      ]
+    },
+    {
+      "tool": "claude",
+      "label": "Claude Code",
+      "target": ".claude/skills",
+      "shared": "_shared",
+      "skills": [
+        "dojo-assess",
+        "dojo-hack",
+        "dojo-init",
+        "dojo-notebook",
+        "dojo-plan",
+        "dojo-quiz",
+        "dojo-reset",
+        "dojo-stage",
+        "dojo-teach"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//mnt/c/Users/18047/Documents/GitHub/**)",
+      "Bash(ls \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\leon\\\\projects\\\\shangguigu-learning\\\\zhang-gui-zhi-ku\\\\src\\\\\" 2>/dev/null || echo \"not found\")",
+      "Read(///wsl.localhost/Ubuntu/home/leon/projects/shangguigu-learning/**)",
+      "Bash(uv run *)",
+      "Bash(python test/11_rrf_rerank_practice.py)"
+    ]
+  }
+}
