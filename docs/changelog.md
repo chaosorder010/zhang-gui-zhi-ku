@@ -61,3 +61,14 @@
 
 - **变更**: 更新 5 份护城河文档, 填充项目-specific 内容
 - **新增**: project-brief.md (方法论加 TDD), tech-data.md (加测试策略/分层/seam), baseline-1.md (补测试欠账 + 前端决策)
+
+### Baseline-1 MVP 完成
+
+- **代码**: FastAPI + LangChain + LangGraph 最小问答链路, /api/ask 多轮对话
+- **前端**: 原生 HTML/CSS/JS + nginx serve static（无 Vite）
+- **测试**: pytest 骨架, conftest `_force_test_env` + `lru_cache clear`, 8 测试全过 (0.07s)
+  - 集成 5: router + mock graph (返回/session_id/空 key 400/空 question 422)
+  - 单元 3: graph 多轮记忆 + thread_id 隔离
+- **TDD 驱动改进**: `build_graph(llm=None)` 接口由测试驱动加出, 可注入 mock
+- **Docker**: Dockerfile.backend + docker-compose.yml + nginx.conf
+- **脚本**: scripts/setup_test_env.sh + scripts/run_tests.sh
