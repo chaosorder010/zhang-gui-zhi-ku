@@ -2,6 +2,29 @@
 
 ## 2026-07-10
 
+### Baseline-2 启动: LangGraph 编排导入工作流
+
+- **决策**: 后端用 LangGraph 状态机编排导入链路
+  - 节点: extract_with_mineru → recognize_item → chunk → embed → store_milvus
+  - ImportState 持久化 checkpoint, 失败可重试
+- **决策**: MinerU 改用云 API, 调用 `/api/v4/file-urls/batch` 申请上传 URL → PUT → 轮询
+  - Why: 无需本地 GPU + 模型下载
+- **决策**: Milvus Standalone (轻量)
+
+### Slices 2-5 完成: recognizer + mineru_client + LangGraph + upload router
+
+- Slice 2: recognizer (LLM 抽主体名, mock LLM) — 7 tests
+- Slice 3: mineru_client (MinerU v4 API: 申请URL→PUT上传→轮询→下载zip→解压md) — 10 tests
+- Slice 4: import_workflow (LangGraph 状态机编排: extract→recognize→chunk→embed→store) — 12 tests
+- Slice 5: upload router (POST /api/upload + GET /api/documents, 后台触发 workflow) — 4 tests
+- 总: 53 tests, 1.32s
+
+### Slice 1 完成: chunker + retriever TDD
+
+- `chunker.chunk_by_section`: 按 `##` 标题深度切分, 每块头拼 `[item_name]`, 兜底 max_chars 切
+- `retriever.rrf_fuse`: RRF 倒数排名融合, 支持 top_k
+- 测试: unit 20/20 通过 (0.10s)
+
 ### 初始设计
 
 - **决策**: 选 Route C 混合栈 (本地 embedding + 云端 LLM)
@@ -17,6 +40,22 @@
 - **文档数据库**: MongoDB
 - **对象存储**: MinIO 存图片
 - **检索增强**: 三路检索（稠密+稀疏+HyDE）+ MCP 网络搜索，RRF 融合
+
+### 空结果处理澄清
+
+- **变更**: Milvus 无结果或全低分 → 直接回"知识库无此信息", 不调 LLM 兜底
+  - **Why**: 电子产品维修场景错误信息代价高, 宁缺勿错
+
+### 分块策略澄清
+
+- **变更**: 三层分块 (标题切分 → 超长二次切 → 过短合并)
+  - **Why**: MinerU 输出 MD 带标题层级, 可利用; 三层兜底保证 chunk 大小均匀
+- **接缝**: 纯函数 `split_markdown`, 可独立单元测
+
+### 稠密稀疏融合澄清
+
+- **变更**: 路1 Milvus 内线性加权 `score = α·dense + (1-α)·sparse`
+  - **Why**: 稠密稀疏同类排名空间, 线性加权简单可解释, α 网格搜索调参
 
 ### 框架职责澄清
 

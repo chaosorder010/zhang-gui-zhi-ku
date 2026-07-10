@@ -7,6 +7,7 @@ from pathlib import Path
 
 from apps.backend.core.config import get_settings
 from apps.backend.routers import ask as ask_router
+from apps.backend.routers import upload as upload_router
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(ask_router.router)
+    app.include_router(upload_router.router)
 
     # Static frontend
     frontend_dir = Path(__file__).resolve().parent.parent / "frontend"

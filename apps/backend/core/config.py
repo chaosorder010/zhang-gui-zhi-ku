@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     openai_model: str = "gpt-4o-mini"
 
+    # MinerU
+    mineru_api_key: str = ""
+    mineru_base_url: str = "https://mineru.net/api/v4"
+
+    # Milvus
+    milvus_host: str = "localhost"
+    milvus_port: str = "19530"
+    milvus_collection: str = "zgzk"
+
     # CORS
     cors_origins: list[str] = ["*"]
 
