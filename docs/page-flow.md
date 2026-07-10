@@ -18,14 +18,15 @@ FastAPI 接收
     v
 LangGraph 编排
     |-- 读取对话历史 (多轮上下文)
+    |-- query 主体识别 (LLM 抽取 item name)
+    |     └── 识别失败 → filter 关
     |-- 三路并行检索
-    |     |-- 稠密: 向量相似度 Milvus
-    |     |-- 稀疏: BM25 Milvus
-    |     |-- HyDE: 生成假设文档 -> embedding -> Milvus
-    |-- MCP 网络搜索 (可选)
+    |     |-- 路1: query → Milvus 混合检索 (稠密+稀疏, item_name 硬过滤) → L1 top-20
+    |     |-- 路2: HyDE → Milvus (同 filter)                          → L2 top-20
+    |     |-- 路3: MCP 网络搜索 (外网, 不过滤)                         → L3 top-10
     |
     v
-RRF 倒数排名融合 (三路结果)
+RRF 倒数排名融合: score(d) = Σ 1/(k + rank_i(d))
     |
     v
 Rerank 精排 (BGE-Reranker-Large)
@@ -52,7 +53,7 @@ Rerank 精排 (BGE-Reranker-Large)
 MinerU 解析 (文本+图片)
     |
     v
-主体识别 (item name)
+LLM 主体识别 (item name)
     |
     v
 按章节/标题分块
