@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>掌柜智库</title>
+    <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+    <div class="app">
+        <header class="topbar">
+            <h1>掌柜智库</h1>
+            <button id="new-chat" type="button">新对话</button>
+        </header>
+        <main id="chat" class="chat"></main>
+        <form id="ask-form" class="input-area">
+            <input
+                id="question"
+                name="question"
+                type="text"
+                placeholder="输入问题..."
+                autocomplete="off"
+                required
+            />
+            <button type="submit">发送</button>
+        </form>
+    </div>
+    <script type="module" src="/main.js"></script>
+</body>
+</html>
