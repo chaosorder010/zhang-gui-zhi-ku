@@ -1,7 +1,7 @@
 """Milvus 操作 wrapper (pymilvus 3.0.0 MilvusClient 新 API)."""
 from __future__ import annotations
 
-from pymilvus import MilvusClient, DataType, AnnSearchRequest, RRFRanker
+from pymilvus import MilvusClient, DataType, AnnSearchRequest, WeightedRanker
 from apps.backend.core.config import get_settings
 
 DENSE_DIM = 1024
@@ -64,12 +64,14 @@ def bulk_upsert(vectors: list[dict]) -> None:
     client.insert(_collection_name(), rows)
 
 
+def _to_sparse_payload(sparse: dict) -> list[dict]:
+    """把 {idx: val} 转成 Milvus 接受的 sparse vector payload."""
+    return [{int(k): float(v)} for k, v in sparse.items()]
+
+
 def _normalize_row(v: dict) -> dict:
     sparse = v.get("sparse_vector", {})
-    if isinstance(sparse, dict):
-        sparse_payload = [{int(k): float(val)} for k, val in sparse.items()]
-    else:
-        sparse_payload = sparse
+    sparse_payload = _to_sparse_payload(sparse) if isinstance(sparse, dict) else sparse
     return {
         "text": v.get("text", ""),
         "item_name": v.get("item_name", ""),
@@ -109,14 +111,14 @@ def hybrid_search(
         expr=filt,
     )
     sparse_req = AnnSearchRequest(
-        data=[[{int(k): float(v)} for k, v in query_sparse.items()]],
+        data=[_to_sparse_payload(query_sparse)],
         anns_field="sparse_vector",
         param={"metric_type": "IP", "params": {"drop_ratio_search": 0.2}},
         limit=limit,
         expr=filt,
     )
 
-    ranker = RRFRanker(60)
+    ranker = WeightedRanker(0.5, 0.5)
     raw = client.hybrid_search(
         collection,
         reqs=[dense_req, sparse_req],

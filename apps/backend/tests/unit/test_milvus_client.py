@@ -24,20 +24,9 @@ def patch_client(mock_client):
         yield mock_client
 
 
-@pytest.fixture
-def reset_client():
-    """每个测试前重置模块级 _client."""
-    import apps.backend.services.milvus_client as mod
-
-    old = mod._client
-    mod._client = None
-    yield
-    mod._client = old
-
-
 @pytest.mark.unit
 class TestEnsureCollection:
-    def test_creates_schema_when_not_exists(self, mock_client, reset_client):
+    def test_creates_schema_when_not_exists(self, mock_client):
         """collection 不存在时应创建 schema + 索引."""
         from apps.backend.services import milvus_client as mod
 
@@ -49,7 +38,7 @@ class TestEnsureCollection:
         mock_client.create_collection.assert_called_once()
         mock_client.create_index.assert_called()
 
-    def test_skips_when_exists(self, mock_client, reset_client):
+    def test_skips_when_exists(self, mock_client):
         """collection 已存在时跳过创建."""
         from apps.backend.services import milvus_client as mod
 
@@ -63,7 +52,7 @@ class TestEnsureCollection:
 
 @pytest.mark.unit
 class TestBulkUpsert:
-    def test_inserts_rows(self, mock_client, reset_client):
+    def test_inserts_rows(self, mock_client):
         """bulk_upsert 应调用 insert 并传入行数据."""
         from apps.backend.services import milvus_client as mod
 
@@ -98,7 +87,7 @@ class TestBulkUpsert:
         assert rows[0]["item_name"] == "iPhone16"
         assert len(rows[0]["dense_vector"]) == 1024
 
-    def test_empty_list_noop(self, mock_client, reset_client):
+    def test_empty_list_noop(self, mock_client):
         """空列表不调用 insert."""
         from apps.backend.services import milvus_client as mod
 
@@ -111,7 +100,7 @@ class TestBulkUpsert:
 
 @pytest.mark.unit
 class TestHybridSearch:
-    def test_hybrid_search_with_item_name_filter(self, mock_client, reset_client):
+    def test_hybrid_search_with_item_name_filter(self, mock_client):
         """带 item_name 过滤时应传 filter expression."""
         from apps.backend.services import milvus_client as mod
 
@@ -138,7 +127,7 @@ class TestHybridSearch:
         dense_req = reqs[0]
         assert dense_req.filter == 'item_name == "iPhone16"'
 
-    def test_hybrid_search_without_filter(self, mock_client, reset_client):
+    def test_hybrid_search_without_filter(self, mock_client):
         """无 item_name 时不传 filter."""
         from apps.backend.services import milvus_client as mod
 
@@ -156,7 +145,7 @@ class TestHybridSearch:
         dense_req = reqs[0]
         assert dense_req.filter == ""
 
-    def test_hybrid_search_returns_results(self, mock_client, reset_client):
+    def test_hybrid_search_returns_results(self, mock_client):
         """返回结果应解析为 list[dict]."""
         from apps.backend.services import milvus_client as mod
 
