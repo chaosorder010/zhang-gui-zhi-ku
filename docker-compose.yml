@@ -10,6 +10,16 @@ services:
       - .env
     environment:
       - PORT=8000
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      - BGE_MODEL_PATH=/models/bge-m3
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ~/models:/models:ro
+    depends_on:
+      milvus:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -23,3 +33,31 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  milvus:
+    image: milvusdb/milvus:v2.5.15
+    container_name: zgzk-milvus
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+      - "2379:2379"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      COMMON_STORAGETYPE: local
+      DEPLOY_MODE: STANDALONE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 90s
+    restart: unless-stopped
+
+volumes:
+  milvus_data:

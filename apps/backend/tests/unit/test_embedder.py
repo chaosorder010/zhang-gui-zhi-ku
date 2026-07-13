@@ -118,6 +118,39 @@ class TestEmbedChunks:
         assert len(calls) == 1
         assert calls[0]["max_length"] == 512
 
+    def test_large_batch_splits_by_batch_size(self, mock_m3, monkeypatch):
+        """大量 chunk 时按批次编码，避免一次全量送入 OOM."""
+        calls: list[list] = []
+        origin = mock_m3.encode
+
+        def spy_encode(sentences, **kwargs):
+            calls.append(list(sentences))
+            return origin(sentences, **kwargs)
+
+        monkeypatch.setattr(mock_m3, "encode", spy_encode)
+        # 10 chunks, batch_size=4 → 应分 3 次调用 (4,4,2)
+        chunks = [{"text": f"c{i}"} for i in range(10)]
+        out = embedder.embed_chunks(chunks, batch_size=4)
+        assert len(calls) == 3
+        assert len(calls[0]) == 4
+        assert len(calls[1]) == 4
+        assert len(calls[2]) == 2
+        assert len(out) == 10  # 输出数量不变
+
+    def test_batch_size_default_32(self, mock_m3, monkeypatch):
+        """默认 batch_size=32，小批量只调一次 encode."""
+        calls: list[list] = []
+        origin = mock_m3.encode
+
+        def spy_encode(sentences, **kwargs):
+            calls.append(list(sentences))
+            return origin(sentences, **kwargs)
+
+        monkeypatch.setattr(mock_m3, "encode", spy_encode)
+        chunks = [{"text": f"c{i}"} for i in range(5)]
+        embedder.embed_chunks(chunks)  # 5 < 32 → 1 次
+        assert len(calls) == 1
+
 
 @pytest.mark.unit
 class TestMockEmbedderFallback:

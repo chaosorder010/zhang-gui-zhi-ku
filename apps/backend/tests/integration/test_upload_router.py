@@ -4,7 +4,7 @@ Seam: FastAPI router, mock import_workflow。
 """
 from __future__ import annotations
 
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -23,9 +23,8 @@ def _client():
 
 @pytest.mark.integration
 class TestUploadRouter:
-    @patch("apps.backend.routers.upload.trigger_import", new_callable=AsyncMock)
-    def test_upload_pdf_returns_task_id(self, mock_trigger):
-        mock_trigger.return_value = None
+    @patch("apps.backend.routers.upload.trigger_import_sync")
+    def test_upload_pdf_returns_task_id(self, mock_trigger_sync):
         resp = _client().post(
             "/api/upload",
             files={"file": ("test.pdf", b"%PDF-1.4 fake", "application/pdf")},
@@ -34,7 +33,7 @@ class TestUploadRouter:
         data = resp.json()
         assert "task_id" in data
         assert data["file_name"] == "test.pdf"
-        mock_trigger.assert_called_once()
+        mock_trigger_sync.assert_called_once()
 
     def test_upload_rejects_non_pdf(self):
         resp = _client().post(

@@ -65,6 +65,11 @@ def _node_extract(state: ImportState) -> ImportState:
             file_name=state["file_name"],
             file_binary=state["file_binary"],
         )
+        # 校验 MinerU 输出质量
+        if not md or not md.strip():
+            return {**state, "status": "failed", "error": "extract: MinerU 返回空内容"}
+        if "##" not in md:
+            return {**state, "status": "failed", "error": "extract: 无二级标题，无法分块"}
         return {**state, "markdown": md, "status": "extracting"}
     except Exception as e:
         return {**state, "status": "failed", "error": f"extract: {e}"}
@@ -113,7 +118,11 @@ def _node_store(state: ImportState) -> ImportState:
     if state.get("status") == "failed":
         return state
     try:
-        bulk_upsert(state.get("vectors", []))
+        vectors = state.get("vectors", [])
+        # 透传 file_name 作为 doc_name
+        doc_name = state.get("file_name", "")
+        enriched = [{**v, "doc_name": doc_name} for v in vectors]
+        bulk_upsert(enriched)
         return {**state, "status": "done"}
     except Exception as e:
         return {**state, "status": "failed", "error": f"store: {e}"}

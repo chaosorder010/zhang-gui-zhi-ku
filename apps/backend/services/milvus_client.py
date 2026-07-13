@@ -111,7 +111,8 @@ def hybrid_search(
         expr=filt,
     )
     sparse_req = AnnSearchRequest(
-        data=[_to_sparse_payload(query_sparse)],
+        # pymilvus 3.0: sparse data 格式为 [{token_id: weight, ...}], 每元素是一个稀疏向量
+        data=[query_sparse],
         anns_field="sparse_vector",
         param={"metric_type": "IP", "params": {"drop_ratio_search": 0.2}},
         limit=limit,
