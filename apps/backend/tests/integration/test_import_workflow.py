@@ -191,3 +191,110 @@ class TestImportGraphEndToEnd:
         final = graph.invoke(_make_state())
         assert final["status"] == "failed"
         assert "extract" in final["error"]
+
+
+@pytest.mark.integration
+class TestImportGraphFailFast:
+    """条件边 fail-fast: 任一节点失败 → 后续节点不被执行, 直接 END.
+
+    通过 assert_not_called 验证 fail-fast 行为 — 这是 P1 的核心契约:
+    失败时节点的下游不应被访问(而非静默空转)。
+    """
+
+    @patch("apps.backend.services.import_workflow.bulk_upsert")
+    @patch("apps.backend.services.import_workflow.embed_chunks")
+    @patch("apps.backend.services.import_workflow.chunk_by_section")
+    @patch("apps.backend.services.import_workflow.recognize_item")
+    @patch("apps.backend.services.import_workflow.extract_markdown")
+    def test_extract_failure_skips_all_downstream(
+        self, mock_extract, mock_recognize, mock_chunk, mock_embed, mock_upsert,
+    ):
+        """extract 失败 → recognize/chunk/embed/store 均不被调用."""
+        mock_extract.side_effect = RuntimeError("mineru down")
+        graph = build_import_graph()
+        final = graph.invoke(_make_state())
+        assert final["status"] == "failed"
+        assert "extract" in final["error"]
+        mock_recognize.assert_not_called()
+        mock_chunk.assert_not_called()
+        mock_embed.assert_not_called()
+        mock_upsert.assert_not_called()
+
+    @patch("apps.backend.services.import_workflow.bulk_upsert")
+    @patch("apps.backend.services.import_workflow.embed_chunks")
+    @patch("apps.backend.services.import_workflow.chunk_by_section")
+    @patch("apps.backend.services.import_workflow.recognize_item")
+    @patch("apps.backend.services.import_workflow.extract_markdown")
+    def test_recognize_failure_skips_downstream(
+        self, mock_extract, mock_recognize, mock_chunk, mock_embed, mock_upsert,
+    ):
+        """recognize 失败 → chunk/embed/store 均不被调用."""
+        mock_extract.return_value = "# 手册\n\n## 章节\n\n正文内容"
+        mock_recognize.side_effect = RuntimeError("llm api 500")
+        graph = build_import_graph()
+        final = graph.invoke(_make_state())
+        assert final["status"] == "failed"
+        assert "recognize" in final["error"]
+        mock_chunk.assert_not_called()
+        mock_embed.assert_not_called()
+        mock_upsert.assert_not_called()
+
+    @patch("apps.backend.services.import_workflow.bulk_upsert")
+    @patch("apps.backend.services.import_workflow.embed_chunks")
+    @patch("apps.backend.services.import_workflow.chunk_by_section")
+    @patch("apps.backend.services.import_workflow.recognize_item")
+    @patch("apps.backend.services.import_workflow.extract_markdown")
+    def test_chunk_failure_skips_downstream(
+        self, mock_extract, mock_recognize, mock_chunk, mock_embed, mock_upsert,
+    ):
+        """chunk 失败 → embed/store 均不被调用."""
+        mock_extract.return_value = "# 手册\n\n## 章节\n\n正文内容"
+        mock_recognize.return_value = "iPhone16"
+        mock_chunk.side_effect = RuntimeError("chunker bug")
+        graph = build_import_graph()
+        final = graph.invoke(_make_state())
+        assert final["status"] == "failed"
+        assert "chunk" in final["error"]
+        mock_embed.assert_not_called()
+        mock_upsert.assert_not_called()
+
+    @patch("apps.backend.services.import_workflow.bulk_upsert")
+    @patch("apps.backend.services.import_workflow.embed_chunks")
+    @patch("apps.backend.services.import_workflow.chunk_by_section")
+    @patch("apps.backend.services.import_workflow.recognize_item")
+    @patch("apps.backend.services.import_workflow.extract_markdown")
+    def test_embed_failure_skips_store(
+        self, mock_extract, mock_recognize, mock_chunk, mock_embed, mock_upsert,
+    ):
+        """embed 失败 → store 不被调用."""
+        mock_extract.return_value = "# 手册\n\n## 章节\n\n正文内容"
+        mock_recognize.return_value = "iPhone16"
+        mock_chunk.return_value = [{"text": "x", "chunk_id": 0, "item_name": "iPhone16"}]
+        mock_embed.side_effect = RuntimeError("gpu oom")
+        graph = build_import_graph()
+        final = graph.invoke(_make_state())
+        assert final["status"] == "failed"
+        assert "embed" in final["error"]
+        mock_upsert.assert_not_called()
+
+    @patch("apps.backend.services.import_workflow.bulk_upsert")
+    @patch("apps.backend.services.import_workflow.embed_chunks")
+    @patch("apps.backend.services.import_workflow.chunk_by_section")
+    @patch("apps.backend.services.import_workflow.recognize_item")
+    @patch("apps.backend.services.import_workflow.extract_markdown")
+    def test_store_failure_marks_failed(
+        self, mock_extract, mock_recognize, mock_chunk, mock_embed, mock_upsert,
+    ):
+        """store 失败 → status=failed, error 含 store."""
+        mock_extract.return_value = "# 手册\n\n## 章节\n\n正文内容"
+        mock_recognize.return_value = "iPhone16"
+        mock_chunk.return_value = [{"text": "x", "chunk_id": 0, "item_name": "iPhone16"}]
+        mock_embed.return_value = [
+            {"text": "x", "chunk_id": 0, "item_name": "iPhone16",
+             "dense_vector": [0.1], "sparse_vector": {1: 0.5}}
+        ]
+        mock_upsert.side_effect = RuntimeError("milvus conn refused")
+        graph = build_import_graph()
+        final = graph.invoke(_make_state())
+        assert final["status"] == "failed"
+        assert "store" in final["error"]

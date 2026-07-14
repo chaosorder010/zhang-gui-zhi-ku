@@ -39,8 +39,21 @@ class ImportState(TypedDict):
     openai_model: str
 
 
+def _fail_fast_edge(next_node: str):
+    """构造条件边路由函数: 失败 → END, 否则 → next_node.
+
+    每个节点出边复用此函数, 以 next_node 闭包区分后继.
+    节点内仍保留 status=="failed" 守卫作为防御性深度 (直接测节点/异常路径).
+    """
+    def _route(state: ImportState):
+        if state.get("status") == "failed":
+            return END
+        return next_node
+    return _route
+
+
 def build_import_graph():
-    """构造 LangGraph 状态机."""
+    """构造 LangGraph 状态机 (条件边 fail-fast)."""
     graph = StateGraph(ImportState)
     graph.add_node("extract", _node_extract)
     graph.add_node("recognize_item", _node_recognize)
@@ -49,10 +62,26 @@ def build_import_graph():
     graph.add_node("store", _node_store)
 
     graph.add_edge(START, "extract")
-    graph.add_edge("extract", "recognize_item")
-    graph.add_edge("recognize_item", "chunk")
-    graph.add_edge("chunk", "embed")
-    graph.add_edge("embed", "store")
+    graph.add_conditional_edges(
+        "extract",
+        _fail_fast_edge("recognize_item"),
+        {"recognize_item": "recognize_item", END: END},
+    )
+    graph.add_conditional_edges(
+        "recognize_item",
+        _fail_fast_edge("chunk"),
+        {"chunk": "chunk", END: END},
+    )
+    graph.add_conditional_edges(
+        "chunk",
+        _fail_fast_edge("embed"),
+        {"embed": "embed", END: END},
+    )
+    graph.add_conditional_edges(
+        "embed",
+        _fail_fast_edge("store"),
+        {"store": "store", END: END},
+    )
     graph.add_edge("store", END)
     return graph.compile()
 
