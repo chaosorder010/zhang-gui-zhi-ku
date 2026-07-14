@@ -68,6 +68,105 @@ body {
     border: 1px solid #e5e5e5;
     color: #8c8c8c;
 }
+.upload-panel {
+    background: #fff;
+    border-bottom: 1px solid #e5e5e5;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.upload-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.upload-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #595959;
+}
+.upload-label input[type="file"] {
+    font-size: 13px;
+}
+.upload-label span { color: #8c8c8c; }
+#upload-btn {
+    padding: 6px 16px;
+    background: #1677ff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+}
+#upload-btn:hover { background: #0958d9; }
+#upload-btn:disabled { background: #bae0ff; cursor: wait; }
+.progress-list {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 280px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.progress-row {
+    display: grid;
+    grid-template-columns: minmax(100px, 1fr) auto 120px 36px auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #fafafa;
+    border: 1px solid #f0f0f0;
+}
+.progress-row.row-error { background: #fff1f0; border-color: #ffa39e; }
+.prog-file {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #262626;
+}
+.prog-badge {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+.badge-pending { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
+.badge-success { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+.badge-error   { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; }
+.prog-bar-track {
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.prog-bar-fill {
+    height: 100%;
+    background: #1677ff;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+    width: 0;
+}
+.prog-bar-fill.bar-done { background: #52c41a; }
+.prog-bar-fill.bar-error { background: #ff4d4f; }
+.prog-pct {
+    text-align: right;
+    color: #595959;
+    font-variant-numeric: tabular-nums;
+}
+.prog-error {
+    color: #cf1322;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .input-area {
     display: flex;
     gap: 8px;

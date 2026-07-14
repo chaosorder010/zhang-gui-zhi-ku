@@ -12,7 +12,23 @@
             <h1>掌柜智库</h1>
             <button id="new-chat" type="button">新对话</button>
         </header>
+        <section id="upload-panel" class="upload-panel">
+            <div class="upload-controls">
+                <label class="upload-label">
+                    <input id="file-input" type="file" multiple accept=".pdf,.md,.doc,.docx,.ppt,.pptx" />
+                    <span id="file-count">选择文件</span>
+                </label>
+                <button id="upload-btn" type="button" disabled>上传</button>
+            </div>
+            <div id="progress-list" class="progress-list"></div>
+        </section>
         <main id="chat" class="chat"></main>
+        <section id="doc-panel" class="doc-panel">
+            <h2>已上传文档</h2>
+            <ul id="doc-list" class="doc-list">
+                <li class="doc-empty">暂无文档</li>
+            </ul>
+        </section>
         <form id="ask-form" class="input-area">
             <input
                 id="question"
