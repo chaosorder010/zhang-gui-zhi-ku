@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
@@ -9,6 +10,8 @@ from apps.backend.services.llm import build_llm
 from apps.backend.services.recognizer import recognize_item
 from apps.backend.services.embedder import embed_chunks
 from apps.backend.services.milvus_client import hybrid_search
+
+logger = logging.getLogger(__name__)
 
 # 检索无结果时的回退回答
 _NO_INFO_MESSAGE = "知识库中暂无相关信息, 请换一个问题或联系客服."
@@ -54,8 +57,9 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
         if last_human is None:
             return {"item_name": None}
         item = recognize_item(last_human, llm)
-        # "未知" 视为未识别, 走全量检索
-        return {"item_name": item if item != "未知" else None}
+        result_item = item if item != "未知" else None
+        logger.info("[rag] recognize item_name=%s", result_item)
+        return {"item_name": result_item}
 
     # ── Node 2: 检索 ──
     def retrieve(state: RagState):
@@ -72,6 +76,7 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
             vec["sparse_vector"],
             state["item_name"],
         )
+        logger.info("[rag] retrieve hits=%d item_name=%s", len(chunks), state["item_name"])
         return {"retrieved_chunks": chunks}
 
     # ── Node 3: 生成回答 ──
@@ -92,11 +97,13 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
         # 构建完整消息列表 (system + history)
         messages = [AIMessage(content=system_prompt)] + list(state["messages"])
         response = llm.invoke(messages)
+        logger.info("[rag] chatbot generated answer (len=%d)", len(response.content))
         return {"messages": [response]}
 
     # ── 条件边: 空结果 → 直接返回无信息消息 ──
     def route_after_retrieve(state: RagState):
         if not state["retrieved_chunks"]:
+            logger.info("[rag] route → no_results (empty hits)")
             return "no_results"
         return "chatbot"
 
