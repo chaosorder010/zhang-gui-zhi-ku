@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
 from apps.backend.core.config import get_settings
+from apps.backend.services.milvus_client import delete_by_doc_name
 from apps.backend.services.import_workflow import (
     build_import_graph,
     create_initial_import_state,
@@ -52,40 +53,56 @@ def trigger_import_sync(state: ImportState) -> None:
         }
 
 
+_ALLOWED_SUFFIXES = (".pdf", ".md", ".doc", ".docx", ".ppt", ".pptx")
+
+
+def _is_allowed_file(filename: Optional[str]) -> bool:
+    """校验文件名后缀是否在白名单内."""
+    return bool(filename) and filename.lower().endswith(_ALLOWED_SUFFIXES)
+
+
 @router.post("/upload")
 async def upload(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
 ):
     s = get_settings()
     if not s.mineru_api_key:
         raise HTTPException(400, "MinerU 未配置, 请在 .env 设置 MINERU_API_KEY")
 
-    # 校验文件类型
-    if not file.filename or not file.filename.lower().endswith((".pdf", ".md", ".doc", ".docx", ".ppt", ".pptx")):
-        raise HTTPException(400, "仅支持 PDF/MD/DOC/DOCX/PPT/PPTX 文件")
+    # Fail-fast: 入口校验所有文件名后缀, 任一非法 → 整批拒绝
+    for f in files:
+        if not _is_allowed_file(f.filename):
+            raise HTTPException(400, "仅支持 PDF/MD/DOC/DOCX/PPT/PPTX 文件")
 
-    binary = await file.read()
-    if not binary:
-        raise HTTPException(400, "文件为空")
+    # Fail-fast: 校验所有文件非空, 任一为空 → 整批拒绝
+    binaries = []
+    for f in files:
+        binary = await f.read()
+        if not binary:
+            raise HTTPException(400, "文件为空")
+        binaries.append(binary)
 
-    task_id = str(uuid.uuid4())
-    state = create_initial_import_state(
-        task_id=task_id,
-        file_name=file.filename or "unknown",
-        file_binary=binary,
-        mineru_base_url=s.mineru_base_url,
-        mineru_token=s.mineru_api_key,
-        openai_api_key=s.openai_api_key,
-        openai_base_url=s.openai_base_url,
-        openai_model=s.openai_model,
-    )
+    batch_id = str(uuid.uuid4())
+    tasks = []
+    for f, binary in zip(files, binaries):
+        task_id = str(uuid.uuid4())
+        state = create_initial_import_state(
+            task_id=task_id,
+            file_name=f.filename or "unknown",
+            file_binary=binary,
+            mineru_base_url=s.mineru_base_url,
+            mineru_token=s.mineru_api_key,
+            openai_api_key=s.openai_api_key,
+            openai_base_url=s.openai_base_url,
+            openai_model=s.openai_model,
+        )
+        _task_status[task_id] = {"task_id": task_id, "status": "uploaded", "ts": time.time()}
+        # 每文件独立后台触发 (FastAPI BackgroundTasks → 线程池)
+        background_tasks.add_task(trigger_import_sync, state)
+        tasks.append({"task_id": task_id, "file_name": f.filename, "status": "uploaded"})
 
-    _task_status[task_id] = {"task_id": task_id, "status": "uploaded", "ts": time.time()}
-    # 后台触发 (FastAPI BackgroundTasks → 线程池)
-    background_tasks.add_task(trigger_import_sync, state)
-
-    return {"task_id": task_id, "file_name": file.filename, "status": "uploaded"}
+    return {"batch_id": batch_id, "tasks": tasks, "count": len(tasks)}
 
 
 @router.get("/documents")
@@ -112,3 +129,23 @@ async def get_upload_status(task_id: str):
     if not info:
         raise HTTPException(404, "任务不存在")
     return info
+
+
+@router.delete("/documents/{doc_name}")
+def delete_document(doc_name: str):
+    """删除文档的所有 chunk, 级联清理 task_status."""
+    deleted_chunks = delete_by_doc_name(doc_name)
+
+    if deleted_chunks == 0:
+        return {"doc_name": doc_name, "deleted_chunks": 0, "status": "not_found"}
+
+    # 级联清理 _task_status 中 file_name == doc_name 的条目
+    to_remove = [
+        tid
+        for tid, v in _task_status.items()
+        if v.get("file_name") == doc_name
+    ]
+    for tid in to_remove:
+        del _task_status[tid]
+
+    return {"doc_name": doc_name, "deleted_chunks": deleted_chunks, "status": "deleted"}
