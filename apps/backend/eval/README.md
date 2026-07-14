@@ -1,5 +1,7 @@
 # 检索评估框架 — `apps/backend/eval/`
 
+> **真实评估前置步骤**：需先通过 `import_workflow` 导入一份 PDF 到 Milvus，再运行 `evaluate`。Milvus 为空时跑评估会得到 0/0 指标（无命中可能）。单元测试与 smoke test 使用 mock Milvus，无需真实数据。
+
 离线评估当前 **hybrid search**（稠密 BGE-M3 + 稀疏 IP，WeightedRanker 0.5/0.5）的召回率。
 框架是**可复用的回归工具** — 加 HyDE / Rerank / 调 α 参数后继续复用同一组 Q-A 对对比。
 

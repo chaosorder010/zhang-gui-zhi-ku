@@ -1,0 +1,81 @@
+{
+  "overall": {
+    "count": 4,
+    "recall@5": 1.0,
+    "recall@10": 1.0,
+    "mrr@5": 1.0,
+    "mrr@10": 1.0
+  },
+  "by_type": {
+    "tech_spec": {
+      "count": 1,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@5": 1.0,
+      "mrr@10": 1.0
+    },
+    "error_code": {
+      "count": 1,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@5": 1.0,
+      "mrr@10": 1.0
+    },
+    "item_specific": {
+      "count": 1,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@5": 1.0,
+      "mrr@10": 1.0
+    },
+    "generic_context": {
+      "count": 1,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@5": 1.0,
+      "mrr@10": 1.0
+    }
+  },
+  "per_query": [
+    {
+      "query_id": "smoke_ts",
+      "type": "tech_spec",
+      "question": "iPhone 16 Pro 底部螺丝扭矩规格是多少",
+      "item_name": "iPhone16Pro",
+      "recall@5": 1.0,
+      "mrr@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@10": 1.0
+    },
+    {
+      "query_id": "smoke_ec",
+      "type": "error_code",
+      "question": "故障码 E01 怎么处理",
+      "item_name": "iPhone16",
+      "recall@5": 1.0,
+      "mrr@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@10": 1.0
+    },
+    {
+      "query_id": "smoke_is",
+      "type": "item_specific",
+      "question": "iPhone 16 Pro 的充电口类型",
+      "item_name": "iPhone16Pro",
+      "recall@5": 1.0,
+      "mrr@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@10": 1.0
+    },
+    {
+      "query_id": "smoke_gc",
+      "type": "generic_context",
+      "question": "USB-C 和 Lightning 接口有什么区别",
+      "item_name": null,
+      "recall@5": 1.0,
+      "mrr@5": 1.0,
+      "recall@10": 1.0,
+      "mrr@10": 1.0
+    }
+  ]
+}
