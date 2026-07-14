@@ -22,16 +22,20 @@ dependencies = [
     "python-multipart>=0.0.32",
     "pymilvus>=3.0.0",
     "torch>=2.0.0",
+    "torchvision",
+    "torchaudio",
 ]
 
-# CPU-only torch index (smaller image, no GPU needed for BGE-M3)
+# CUDA-enabled torch (cu124) — RTX 3050 driver supports CUDA 13.0, backward-compatible with cu124
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cpu" }
+torch = { index = "pytorch-cuda" }
+torchvision = { index = "pytorch-cuda" }
+torchaudio = { index = "pytorch-cuda" }
 
 [dependency-groups]
 dev = [
