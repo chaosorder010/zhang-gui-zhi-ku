@@ -92,6 +92,38 @@ class ImportState(TypedDict):
     openai_model: str
 
 
+def create_initial_import_state(
+    task_id: str,
+    file_name: str,
+    file_binary: bytes,
+    mineru_base_url: str,
+    mineru_token: str,
+    openai_api_key: str,
+    openai_base_url: str,
+    openai_model: str,
+) -> ImportState:
+    """构造初始 ImportState (所有产出字段置空, status=uploaded).
+
+    集中 state schema 知识于 services 层, 避免 router 感知字段细节.
+    """
+    return {
+        "task_id": task_id,
+        "file_name": file_name,
+        "file_binary": file_binary,
+        "item_name": None,
+        "markdown": "",
+        "chunks": [],
+        "vectors": [],
+        "status": "uploaded",
+        "error": None,
+        "mineru_base_url": mineru_base_url,
+        "mineru_token": mineru_token,
+        "openai_api_key": openai_api_key,
+        "openai_base_url": openai_base_url,
+        "openai_model": openai_model,
+    }
+
+
 def _fail_fast_edge(next_node: str):
     """构造条件边路由函数: 失败 → END, 否则 → next_node.
 

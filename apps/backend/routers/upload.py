@@ -9,7 +9,11 @@ from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
 from apps.backend.core.config import get_settings
-from apps.backend.services.import_workflow import build_import_graph, ImportState
+from apps.backend.services.import_workflow import (
+    build_import_graph,
+    create_initial_import_state,
+    ImportState,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,22 +70,16 @@ async def upload(
         raise HTTPException(400, "文件为空")
 
     task_id = str(uuid.uuid4())
-    state: ImportState = {
-        "task_id": task_id,
-        "file_name": file.filename or "unknown",
-        "file_binary": binary,
-        "item_name": None,
-        "markdown": "",
-        "chunks": [],
-        "vectors": [],
-        "status": "uploaded",
-        "error": None,
-        "mineru_base_url": s.mineru_base_url,
-        "mineru_token": s.mineru_api_key,
-        "openai_api_key": s.openai_api_key,
-        "openai_base_url": s.openai_base_url,
-        "openai_model": s.openai_model,
-    }
+    state = create_initial_import_state(
+        task_id=task_id,
+        file_name=file.filename or "unknown",
+        file_binary=binary,
+        mineru_base_url=s.mineru_base_url,
+        mineru_token=s.mineru_api_key,
+        openai_api_key=s.openai_api_key,
+        openai_base_url=s.openai_base_url,
+        openai_model=s.openai_model,
+    )
 
     _task_status[task_id] = {"task_id": task_id, "status": "uploaded", "ts": time.time()}
     # 后台触发 (FastAPI BackgroundTasks → 线程池)
