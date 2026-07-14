@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import functools
 from typing import Optional, TypedDict
 
 from langgraph.graph import StateGraph, START, END
@@ -19,6 +20,48 @@ from apps.backend.services.chunker import chunk_by_section
 from apps.backend.services.embedder import embed_chunks
 from apps.backend.services.milvus_client import bulk_upsert
 from apps.backend.core.config import Settings
+
+
+def node_handler(
+    on_success_status: str,
+    error_prefix: str,
+):
+    """节点装饰器: 统一错误处理 + fail-fast 守卫.
+
+    消除各节点重复的::
+
+        if state.get("status") == "failed":
+            return state
+        try:
+            ...
+        except Exception as e:
+            return {**state, "status": "failed", "error": f"X: {e}"}
+
+    用法::
+
+        @node_handler(on_success_status="extracting", error_prefix="extract")
+        def _node_extract(state: ImportState) -> dict:
+            md = extract_markdown(...)
+            if not md:
+                raise ValueError("MinerU 返回空内容")
+            return {"markdown": md}
+
+    Args:
+        on_success_status: 节点成功时写入 state["status"] 的值
+        error_prefix: 失败时 error 字段前缀, 用于区分失败来源
+    """
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(state: ImportState) -> ImportState:
+            if state.get("status") == "failed":
+                return state
+            try:
+                updates = fn(state) or {}
+                return {**state, **updates, "status": on_success_status}
+            except Exception as e:
+                return {**state, "status": "failed", "error": f"{error_prefix}: {e}"}
+        return wrapper
+    return decorator
 
 
 class ImportState(TypedDict):
@@ -86,72 +129,54 @@ def build_import_graph():
     return graph.compile()
 
 
-def _node_extract(state: ImportState) -> ImportState:
-    try:
-        md = extract_markdown(
-            base_url=state["mineru_base_url"],
-            token=state["mineru_token"],
-            file_name=state["file_name"],
-            file_binary=state["file_binary"],
-        )
-        # 校验 MinerU 输出质量
-        if not md or not md.strip():
-            return {**state, "status": "failed", "error": "extract: MinerU 返回空内容"}
-        if "##" not in md:
-            return {**state, "status": "failed", "error": "extract: 无二级标题，无法分块"}
-        return {**state, "markdown": md, "status": "extracting"}
-    except Exception as e:
-        return {**state, "status": "failed", "error": f"extract: {e}"}
+@node_handler(on_success_status="extracting", error_prefix="extract")
+def _node_extract(state: ImportState) -> dict:
+    md = extract_markdown(
+        base_url=state["mineru_base_url"],
+        token=state["mineru_token"],
+        file_name=state["file_name"],
+        file_binary=state["file_binary"],
+    )
+    # 校验 MinerU 输出质量
+    if not md or not md.strip():
+        raise ValueError("MinerU 返回空内容")
+    if "##" not in md:
+        raise ValueError("无二级标题，无法分块")
+    return {"markdown": md}
 
 
-def _node_recognize(state: ImportState) -> ImportState:
-    if state.get("status") == "failed":
-        return state
-    try:
-        settings = Settings(
-            openai_api_key=state["openai_api_key"],
-            openai_base_url=state["openai_base_url"],
-            openai_model=state["openai_model"],
-        )
-        llm = build_recognizer(settings)
-        item = recognize_item(state.get("markdown", ""), llm=llm, settings=settings)
-        return {**state, "item_name": item, "status": "recognizing"}
-    except Exception as e:
-        return {**state, "status": "failed", "error": f"recognize: {e}"}
+@node_handler(on_success_status="recognizing", error_prefix="recognize")
+def _node_recognize(state: ImportState) -> dict:
+    settings = Settings(
+        openai_api_key=state["openai_api_key"],
+        openai_base_url=state["openai_base_url"],
+        openai_model=state["openai_model"],
+    )
+    llm = build_recognizer(settings)
+    item = recognize_item(state.get("markdown", ""), llm=llm, settings=settings)
+    return {"item_name": item}
 
 
-def _node_chunk(state: ImportState) -> ImportState:
-    if state.get("status") == "failed":
-        return state
-    try:
-        chunks = chunk_by_section(
-            state.get("markdown", ""),
-            item_name=state.get("item_name"),
-        )
-        return {**state, "chunks": chunks, "status": "chunking"}
-    except Exception as e:
-        return {**state, "status": "failed", "error": f"chunk: {e}"}
+@node_handler(on_success_status="chunking", error_prefix="chunk")
+def _node_chunk(state: ImportState) -> dict:
+    chunks = chunk_by_section(
+        state.get("markdown", ""),
+        item_name=state.get("item_name"),
+    )
+    return {"chunks": chunks}
 
 
-def _node_embed(state: ImportState) -> ImportState:
-    if state.get("status") == "failed":
-        return state
-    try:
-        vectors = embed_chunks(state.get("chunks", []))
-        return {**state, "vectors": vectors, "status": "embedding"}
-    except Exception as e:
-        return {**state, "status": "failed", "error": f"embed: {e}"}
+@node_handler(on_success_status="embedding", error_prefix="embed")
+def _node_embed(state: ImportState) -> dict:
+    vectors = embed_chunks(state.get("chunks", []))
+    return {"vectors": vectors}
 
 
-def _node_store(state: ImportState) -> ImportState:
-    if state.get("status") == "failed":
-        return state
-    try:
-        vectors = state.get("vectors", [])
-        # 透传 file_name 作为 doc_name
-        doc_name = state.get("file_name", "")
-        enriched = [{**v, "doc_name": doc_name} for v in vectors]
-        bulk_upsert(enriched)
-        return {**state, "status": "done"}
-    except Exception as e:
-        return {**state, "status": "failed", "error": f"store: {e}"}
+@node_handler(on_success_status="done", error_prefix="store")
+def _node_store(state: ImportState) -> dict:
+    vectors = state.get("vectors", [])
+    # 透传 file_name 作为 doc_name
+    doc_name = state.get("file_name", "")
+    enriched = [{**v, "doc_name": doc_name} for v in vectors]
+    bulk_upsert(enriched)
+    return {}
