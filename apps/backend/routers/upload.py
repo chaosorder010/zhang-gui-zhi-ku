@@ -1,6 +1,7 @@
 """上传路由: 接收 PDF → 触发 LangGraph 导入工作流."""
 from __future__ import annotations
 
+import logging
 import uuid
 import time
 from typing import Optional
@@ -9,6 +10,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 
 from apps.backend.core.config import get_settings
 from apps.backend.services.import_workflow import build_import_graph, ImportState
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
@@ -20,19 +23,25 @@ _TTL_SECONDS = 3600  # 任务状态保留 1 小时
 
 def trigger_import_sync(state: ImportState) -> None:
     """后台同步触发 LangGraph 导入 (供 BackgroundTasks 调用)."""
+    task_id = state["task_id"]
+    logger.info("[import:%s] workflow started (file=%s)", task_id, state.get("file_name"))
     graph = build_import_graph()
     try:
         final = graph.invoke(state)
-        _task_status[state["task_id"]] = {
-            "task_id": state["task_id"],
+        _task_status[task_id] = {
+            "task_id": task_id,
             "status": final.get("status", "unknown"),
             "item_name": final.get("item_name"),
             "error": final.get("error"),
             "ts": time.time(),
         }
+        log_level = logger.info if final.get("status") == "done" else logger.warning
+        log_level("[import:%s] workflow finished status=%s item_name=%s",
+                  task_id, final.get("status"), final.get("item_name"))
     except Exception as e:
-        _task_status[state["task_id"]] = {
-            "task_id": state["task_id"],
+        logger.error("[import:%s] workflow crashed: %s", task_id, e, exc_info=True)
+        _task_status[task_id] = {
+            "task_id": task_id,
             "status": "failed",
             "error": str(e),
             "ts": time.time(),

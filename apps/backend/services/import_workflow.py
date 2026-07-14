@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import functools
+import logging
 from typing import Optional, TypedDict
 
 from langgraph.graph import StateGraph, START, END
@@ -20,6 +21,8 @@ from apps.backend.services.chunker import chunk_by_section
 from apps.backend.services.embedder import embed_chunks
 from apps.backend.services.milvus_client import bulk_upsert
 from apps.backend.core.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 def node_handler(
@@ -53,12 +56,19 @@ def node_handler(
     def decorator(fn):
         @functools.wraps(fn)
         def wrapper(state: ImportState) -> ImportState:
+            task_id = state.get("task_id", "?")
             if state.get("status") == "failed":
+                logger.warning("[import:%s] skip %s (already failed: %s)",
+                              task_id, fn.__name__, state.get("error"))
                 return state
+            logger.info("[import:%s] enter %s", task_id, fn.__name__)
             try:
                 updates = fn(state) or {}
-                return {**state, **updates, "status": on_success_status}
+                result = {**state, **updates, "status": on_success_status}
+                logger.info("[import:%s] exit %s → status=%s", task_id, fn.__name__, on_success_status)
+                return result
             except Exception as e:
+                logger.error("[import:%s] %s failed: %s", task_id, fn.__name__, e)
                 return {**state, "status": "failed", "error": f"{error_prefix}: {e}"}
         return wrapper
     return decorator
