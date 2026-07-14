@@ -1,73 +1,54 @@
-# 页面/流程说明
+# 页面与流程说明
 
-## 用户页面
+> 生成日期: 2026-07-14
 
-| 页面 | 路由 | 说明 |
+---
+
+## 1. 页面
+
+| 路径 | 类型 | 说明 |
 |---|---|---|
-| 问答页 | `/` | 主界面, 输入问题, 显示回答+来源 |
-| 上传页 | `/upload` | 上传 PDF/MD 文档 |
+| `/` | 静态页 | nginx serve, 问答界面 |
+| `/api/upload` | API | 上传 PDF/MD |
+| `/api/ask` | API | 问答 (多轮) |
+| `/api/documents` | API | 文档/任务列表 |
+| `/api/upload/{task_id}` | API | 导入任务状态 |
 
-## 问答流程
+前端无构建工具链, 原生 HTML + CSS + JS。
 
-```
-用户输入问题
-    |
-    v
-FastAPI 接收
-    |
-    v
-LangGraph 编排
-    |-- 读取对话历史 (多轮上下文)
-    |-- query 主体识别 (LLM 抽取 item name)
-    |     └── 识别失败 → filter 关
-    |-- 三路并行检索
-    |     |-- 路1: query → Milvus 混合检索 (稠密+稀疏, item_name 硬过滤) → L1 top-20
-    |     |-- 路2: HyDE → Milvus (同 filter)                          → L2 top-20
-    |     |-- 路3: MCP 网络搜索 (外网, 不过滤)                         → L3 top-10
-    |
-    v
-RRF 倒数排名融合: score(d) = Σ 1/(k + rank_i(d))
-    |
-    v
-Rerank 精排 (BGE-Reranker-Large)
-    |
-    v
-组装 prompt (上下文 + 检索片段)
-    |
-    v
-云端 LLM API 生成 (LangChain)
-    |
-    v
-返回回答 + 来源片段
-    |
-    v
-前端展示, 存入对话历史
-```
+## 2. 用户流程
 
-## 导入(索引)流程
+### 文档导入
 
 ```
-上传 PDF/MD
-    |
-    v
-MinerU 解析 (文本+图片)
-    |
-    v
-LLM 主体识别 (item name)
-    |
-    v
-按章节/标题分块
-    |
-    v
-每 chunk 开头拼接 item_name
-    |
-    v
-embedding 向量化
-    |
-    v
-Milvus 入库 (chunk + item_name 常量字段 + 元数据)
+用户上传 PDF
+  → POST /api/upload → 返回 task_id
+  → 后台 LangGraph 编排:
+      extract (MinerU) → recognize (LLM) → chunk (三层分块)
+      → embed (BGE-M3) → store (Milvus)
+  → 条件边: 任一节点失败 → 直接 END
+  → GET /api/upload/{task_id} 查状态 (uploaded/done/failed)
 ```
 
-## 导航问答
+### 问答
 
-问答页 <--> 上传页 (顶部导航切换)
+```
+用户提问
+  → POST /api/ask {question, session_id}
+  → graph.py 编排:
+      recognize: query 抽 item_name
+      retrieve: embed query → hybrid_search (按 item_name 过滤)
+      条件边:
+        有结果 → chatbot: chunk 拼 system prompt → LLM 生成
+        无结果 → no_results: 直接回 '知识库暂无相关信息'
+  → 返回 {answer, session_id}
+```
+
+## 3. 导航地图
+
+```
+首页 (问答)
+  ├── 输入框 → /api/ask
+  ├── 上传按钮 → /api/upload
+  └── 历史对话 → MemorySaver thread_id 隔离
+```

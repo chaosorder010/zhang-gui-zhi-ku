@@ -1,40 +1,43 @@
 # 功能清单
 
-## P0 — MVP 必做
+> 生成日期: 2026-07-14
+> 优先级: P0 = 必须 | P1 = 重要 | P2 = 可选
 
-| 功能 | 说明 | 优先级 |
+---
+
+## P0 — 核心 (已交付)
+
+| 功能 | 状态 | 验证 |
 |---|---|---|
-| PDF 解析 | MinerU 解析 PDF/MD 文本和图片 | P0 |
-| 主体识别 | 导入时识别 item name，拼到 chunk 开头 embedding | P0 |
-| 分块策略 | 按文档章节/标题递归分块 | P0 |
-| 向量化 | 本地 embedding 模型 | P0 |
-| 向量存储 | Milvus 存 chunk + item_name 常量字段 + 元数据 | P0 |
-| 稠密检索 | 向量相似度检索 | P0 |
-| 稀疏检索 | BM25 关键词检索 | P0 |
-| HyDE 检索 | 假设性文档 embedding 检索 | P0 |
-| MCP 网络搜索 | 外部网络搜索补充 | P0 |
-| RRF 融合 | 三路检索结果倒数排名融合 | P0 |
-| Rerank 精排 | BGE-Reranker-Large / Qwen3-Reranker | P0 |
-| LLM 生成 | 云端 LLM API（LangChain 调用） | P0 |
-| 多轮对话 | LangGraph 编排上下文记忆 | P0 |
-| FastAPI 后端 | REST API | P0 |
-| 前端 UI | HTML + CSS + JS 问答界面 | P0 |
-| 文档上传 | Web 上传 PDF/MD | P0 |
+| PDF/MD 上传 | ✅ | POST /api/upload → 后台触发 |
+| MinerU 解析 | ✅ | extract 节点, 轮询 300s 超时 |
+| 主体识别 | ✅ | LLM 抽取 item_name, 失败回 '未知' |
+| 三层分块 | ✅ | 标题切/超长切/过短合并, item_name 拼头 |
+| 混合嵌入 | ✅ | BGE-M3 稠密+稀疏, batch_size=32 防 OOM |
+| Milvus 写入 | ✅ | bulk_upsert, doc_name 透传 |
+| 导入状态追踪 | ✅ | TTL 1h, 惰性清理 |
+| 主体识别检索 | ✅ | query 抽 item_name, hybrid_search 过滤 |
+| 混合检索 | ✅ | WeightedRanker 0.5/0.5, L2 + IP |
+| 空结果兜底 | ✅ | 无结果直接回 '暂无', 绕开 LLM |
+| 多轮对话 | ✅ | MemorySaver + thread_id 隔离 |
 
-## P1 — 后续可做
+## P1 — 重要 (待排)
 
-| 功能 | 说明 |
+| 功能 | 状态 | 依赖 |
+|---|---|---|
+| 删除文档 | ❌ | DELETE /api/documents/{id} |
+| 批量上传 | ❌ | 一次多个 PDF |
+| 前端进度条 | ❌ | WebSocket 或 polling |
+| HyDE 检索 | ❌ | 评估数据显示需要后 |
+| Rerank 精排 | ❌ | 评估数据显示需要后 |
+| 检索日志看板 | ❌ | 命中率/延迟统计 |
+| 用户反馈 (赞/踩) | ❌ | 质量回馈 |
+
+## P2 — 可选 (远期)
+
+| 功能 | 状态 |
 |---|---|
-| 用户反馈 | 赞/踩, 标注回答质量 |
-| 检索日志 | 记录查询和命中率 |
-| 文档管理 | 删除/更新已有文档 |
-| 批量导入 | 批量上传 PDF |
-
-## P2 — 远期
-
-| 功能 | 说明 |
-|---|---|
-| 权限隔离 | 按部门/角色隔离 |
-| 多语言 | 英文手册支持 |
-| 语音输入 | ASR 转文字 |
-| 页码溯源 | 答案标注来源页 |
+| 权限隔离 | ❌ |
+| 多语言 | ❌ |
+| 语音输入 | ❌ |
+| 页码溯源 | ❌ |
