@@ -9,12 +9,15 @@ import pytest
 
 from apps.backend.services.import_workflow import (
     build_import_graph,
+    create_initial_import_state,
     ImportState,
+    _fail_fast_edge,
     _node_extract,
     _node_recognize,
     _node_chunk,
     _node_embed,
     _node_store,
+    node_handler,
 )
 
 
@@ -298,3 +301,138 @@ class TestImportGraphFailFast:
         final = graph.invoke(_make_state())
         assert final["status"] == "failed"
         assert "store" in final["error"]
+
+
+@pytest.mark.integration
+class TestFailFastEdge:
+    """_fail_fast_edge: 条件边路由的直接契约测试."""
+
+    def test_routes_to_next_when_not_failed(self):
+        """status != failed → 路由到 next_node."""
+        from langgraph.graph import END
+        router = _fail_fast_edge("next_node")
+        assert router(_make_state(status="uploaded")) == "next_node"
+        assert router(_make_state(status="extracting")) == "next_node"
+
+    def test_routes_to_end_when_failed(self):
+        """status == failed → 路由到 END (短路)."""
+        from langgraph.graph import END
+        router = _fail_fast_edge("next_node")
+        state = _make_state()
+        state["status"] = "failed"
+        state["error"] = "something broke"
+        assert router(state) == END
+
+    def test_returns_callable_per_next_node(self):
+        """不同 next_node 参数产生独立的路由函数."""
+        router_a = _fail_fast_edge("node_a")
+        router_b = _fail_fast_edge("node_b")
+        assert router_a(_make_state(status="done")) == "node_a"
+        assert router_b(_make_state(status="done")) == "node_b"
+
+
+@pytest.mark.integration
+class TestNodeHandlerContract:
+    """@node_handler 装饰器的隔离契约测试."""
+
+    def test_decorator_sets_success_status(self):
+        """被装饰函数正常返回时, 装饰器写入 on_success_status."""
+        @node_handler(on_success_status="custom_done", error_prefix="test")
+        def my_node(state: ImportState) -> dict:
+            return {"item_name": "Gadget"}
+
+        result = my_node(_make_state())
+        assert result["status"] == "custom_done"
+        assert result["item_name"] == "Gadget"
+
+    def test_decorator_catches_exception_and_fails(self):
+        """被装饰函数抛出异常时, 装饰器捕获并设置 failed."""
+        @node_handler(on_success_status="done", error_prefix="step")
+        def my_node(state: ImportState) -> dict:
+            raise RuntimeError("boom")
+
+        result = my_node(_make_state())
+        assert result["status"] == "failed"
+        assert "step" in result["error"]
+        assert "boom" in result["error"]
+
+    def test_decorator_skips_on_prior_failure(self):
+        """上游已失败 → 被装饰函数不被执行, 直接透传."""
+        calls = []
+
+        @node_handler(on_success_status="done", error_prefix="step")
+        def my_node(state: ImportState) -> dict:
+            calls.append(1)
+            return {"item_name": "X"}
+
+        prior_failed = _make_state()
+        prior_failed["status"] = "failed"
+        prior_failed["error"] = "upstream error"
+        result = my_node(prior_failed)
+        assert len(calls) == 0
+        assert result["status"] == "failed"
+        assert result["error"] == "upstream error"
+
+    def test_decorator_handles_none_return(self):
+        """被装饰函数返回 None 时, 装饰器应正常处理."""
+        @node_handler(on_success_status="done", error_prefix="step")
+        def my_node(state: ImportState) -> dict | None:
+            return None
+
+        result = my_node(_make_state())
+        assert result["status"] == "done"
+
+    def test_preserves_existing_state_fields(self):
+        """装饰器应保留 state 中未被覆盖的字段."""
+        @node_handler(on_success_status="done", error_prefix="step")
+        def my_node(state: ImportState) -> dict:
+            return {"markdown": "# new"}
+
+        result = my_node(_make_state(file_name="keep.pdf", task_id="t-99"))
+        assert result["file_name"] == "keep.pdf"
+        assert result["task_id"] == "t-99"
+        assert result["markdown"] == "# new"
+        assert result["status"] == "done"
+
+
+@pytest.mark.integration
+class TestCreateInitialImportState:
+    """create_initial_import_state 工厂函数契约."""
+
+    def test_produces_uploaded_status(self):
+        state = create_initial_import_state(
+            task_id="t-1",
+            file_name="a.pdf",
+            file_binary=b"bin",
+            mineru_base_url="https://mu",
+            mineru_token="tok",
+            openai_api_key="k",
+            openai_base_url="https://api",
+            openai_model="gpt-4o-mini",
+        )
+        assert state["status"] == "uploaded"
+        assert state["task_id"] == "t-1"
+        assert state["file_name"] == "a.pdf"
+        assert state["file_binary"] == b"bin"
+        assert state["item_name"] is None
+        assert state["markdown"] == ""
+        assert state["chunks"] == []
+        assert state["vectors"] == []
+        assert state["error"] is None
+
+    def test_passes_through_external_service_config(self):
+        state = create_initial_import_state(
+            task_id="t",
+            file_name="f.pdf",
+            file_binary=b"",
+            mineru_base_url="https://custom.mu",
+            mineru_token="secret-tok",
+            openai_api_key="real-key",
+            openai_base_url="https://v1.custom",
+            openai_model="gpt-4",
+        )
+        assert state["mineru_base_url"] == "https://custom.mu"
+        assert state["mineru_token"] == "secret-tok"
+        assert state["openai_api_key"] == "real-key"
+        assert state["openai_base_url"] == "https://v1.custom"
+        assert state["openai_model"] == "gpt-4"

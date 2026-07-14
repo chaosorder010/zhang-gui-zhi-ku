@@ -4,7 +4,7 @@ Seam: FastAPI router, mock import_workflow。
 """
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
@@ -81,5 +81,107 @@ class TestTaskStatusTTL:
             resp2 = client.get("/api/upload/aging")
             assert resp2.status_code == 404
             assert "aging" not in upload_mod._task_status
+        finally:
+            upload_mod._task_status = old_status
+
+
+@pytest.mark.integration
+class TestTriggerImportSync:
+    """trigger_import_sync 的异常路径: graph.invoke 抛出异常."""
+
+    def test_graph_invoke_exception_marks_failed(self):
+        """graph.invoke 抛异常 → 任务状态标记为 failed."""
+        import apps.backend.routers.upload as upload_mod
+        from apps.backend.services.import_workflow import create_initial_import_state
+
+        state = create_initial_import_state(
+            task_id="crash-1",
+            file_name="boom.pdf",
+            file_binary=b"bin",
+            mineru_base_url="https://mu",
+            mineru_token="tok",
+            openai_api_key="k",
+            openai_base_url="https://api",
+            openai_model="gpt-4o-mini",
+        )
+        upload_mod._task_status.pop("crash-1", None)
+
+        with patch.object(upload_mod, "build_import_graph") as mock_builder:
+            mock_graph = MagicMock()
+            mock_graph.invoke.side_effect = RuntimeError("graph exploded")
+            mock_builder.return_value = mock_graph
+            upload_mod.trigger_import_sync(state)
+
+        stored = upload_mod._task_status.get("crash-1")
+        assert stored is not None
+        assert stored["status"] == "failed"
+        assert "graph exploded" in stored["error"]
+        # cleanup
+        upload_mod._task_status.pop("crash-1", None)
+
+    def test_graph_invoke_success_stores_result(self):
+        """graph.invoke 成功 → 任务状态存储 final status."""
+        import apps.backend.routers.upload as upload_mod
+        from apps.backend.services.import_workflow import create_initial_import_state
+
+        state = create_initial_import_state(
+            task_id="ok-1",
+            file_name="ok.pdf",
+            file_binary=b"bin",
+            mineru_base_url="https://mu",
+            mineru_token="tok",
+            openai_api_key="k",
+            openai_base_url="https://api",
+            openai_model="gpt-4o-mini",
+        )
+        upload_mod._task_status.pop("ok-1", None)
+
+        with patch.object(upload_mod, "build_import_graph") as mock_builder:
+            mock_graph = MagicMock()
+            mock_graph.invoke.return_value = {
+                "status": "done",
+                "item_name": "iPhone16",
+                "error": None,
+            }
+            mock_builder.return_value = mock_graph
+            upload_mod.trigger_import_sync(state)
+
+        stored = upload_mod._task_status.get("ok-1")
+        assert stored is not None
+        assert stored["status"] == "done"
+        assert stored["item_name"] == "iPhone16"
+        # cleanup
+        upload_mod._task_status.pop("ok-1", None)
+
+
+@pytest.mark.integration
+class TestCleanupExpired:
+    """_cleanup_expired 的边界行为."""
+
+    def test_removes_only_expired_entries(self, monkeypatch):
+        import apps.backend.routers.upload as upload_mod
+        import time as _time
+
+        monkeypatch.setattr(upload_mod, "_TTL_SECONDS", 1)
+        old_status = upload_mod._task_status
+        now = _time.time()
+        upload_mod._task_status = {
+            "fresh": {"task_id": "fresh", "status": "done", "ts": now},
+            "stale": {"task_id": "stale", "status": "done", "ts": now - 100},
+        }
+        try:
+            upload_mod._cleanup_expired()
+            assert "fresh" in upload_mod._task_status
+            assert "stale" not in upload_mod._task_status
+        finally:
+            upload_mod._task_status = old_status
+
+    def test_empty_status_no_error(self):
+        import apps.backend.routers.upload as upload_mod
+
+        old_status = upload_mod._task_status
+        upload_mod._task_status = {}
+        try:
+            upload_mod._cleanup_expired()  # should not raise
         finally:
             upload_mod._task_status = old_status
