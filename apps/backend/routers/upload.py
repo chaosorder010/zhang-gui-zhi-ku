@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+import time
 from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
@@ -12,7 +13,9 @@ from apps.backend.services.import_workflow import build_import_graph, ImportStat
 router = APIRouter(prefix="/api", tags=["upload"])
 
 # 内存任务状态 (生产应换 Redis/DB)
+# 每条记录带 ts, 读取时惰性清理 TTL 过期条目防内存泄漏
 _task_status: dict[str, dict] = {}
+_TTL_SECONDS = 3600  # 任务状态保留 1 小时
 
 
 def trigger_import_sync(state: ImportState) -> None:
@@ -25,12 +28,14 @@ def trigger_import_sync(state: ImportState) -> None:
             "status": final.get("status", "unknown"),
             "item_name": final.get("item_name"),
             "error": final.get("error"),
+            "ts": time.time(),
         }
     except Exception as e:
         _task_status[state["task_id"]] = {
             "task_id": state["task_id"],
             "status": "failed",
             "error": str(e),
+            "ts": time.time(),
         }
 
 
@@ -69,7 +74,7 @@ async def upload(
         "openai_model": s.openai_model,
     }
 
-    _task_status[task_id] = {"task_id": task_id, "status": "uploaded"}
+    _task_status[task_id] = {"task_id": task_id, "status": "uploaded", "ts": time.time()}
     # 后台触发 (FastAPI BackgroundTasks → 线程池)
     background_tasks.add_task(trigger_import_sync, state)
 
@@ -81,8 +86,21 @@ async def list_documents():
     return list(_task_status.values())
 
 
+def _cleanup_expired() -> None:
+    """惰性清理 TTL 过期任务状态."""
+    now = time.time()
+    expired = [
+        tid
+        for tid, v in _task_status.items()
+        if now - v.get("ts", 0) > _TTL_SECONDS
+    ]
+    for tid in expired:
+        del _task_status[tid]
+
+
 @router.get("/upload/{task_id}")
 async def get_upload_status(task_id: str):
+    _cleanup_expired()
     info = _task_status.get(task_id)
     if not info:
         raise HTTPException(404, "任务不存在")

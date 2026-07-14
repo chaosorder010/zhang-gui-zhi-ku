@@ -54,3 +54,32 @@ class TestListDocuments:
         resp = _client().get("/api/documents")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
+
+
+@pytest.mark.integration
+class TestTaskStatusTTL:
+    """_task_status TTL 惰性清理: 过期条目在读取时被移除."""
+
+    def test_entry_expires_after_ttl(self, monkeypatch):
+        import apps.backend.routers.upload as upload_mod
+        import time as _time
+
+        ttl = 1  # 1 秒 TTL
+        monkeypatch.setattr(upload_mod, "_TTL_SECONDS", ttl)
+        old_status = upload_mod._task_status
+        upload_mod._task_status = {
+            "aging": {"task_id": "aging", "status": "done", "ts": _time.time()},
+        }
+        try:
+            client = _client()
+            # TTL 内应存在
+            resp = client.get("/api/upload/aging")
+            assert resp.status_code == 200
+            assert resp.json()["task_id"] == "aging"
+            # 等 TTL 过期后再读 → 应被清理
+            _time.sleep(ttl + 0.1)
+            resp2 = client.get("/api/upload/aging")
+            assert resp2.status_code == 404
+            assert "aging" not in upload_mod._task_status
+        finally:
+            upload_mod._task_status = old_status
