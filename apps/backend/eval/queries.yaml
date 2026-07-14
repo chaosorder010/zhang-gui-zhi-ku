@@ -1,0 +1,184 @@
+# RAG 检索评估数据集 — 掌柜智库
+#
+# 每条 query 对应一个已知答案 (relevant_texts), 答案来自已入库的文档 chunk。
+# 评估时 hybrid_search 返回 top-K, 命中 relevant_texts 中任一条即视为召回成功。
+#
+# 类型 (type):
+#   tech_spec       技术参数问  — 数值 / 规格 / 公差
+#   error_code      故障码问    — 错误码含义 / 排查步骤
+#   item_specific   主体相关问  — 特定机型 / 配件
+#   generic_context 通用问      — 概念 / 对比 / 原理
+#
+# 维护约定:
+#   - query_id 全局唯一, 新增不删旧 (便于跨版本对比)
+#   - relevant_texts 是入库 chunk 的精确文本片段 (substring 匹配)
+#   - item_name 对应 Milvus 中的主体过滤字段, 无特定主体留 null
+
+---
+- query_id: ts_001
+  type: tech_spec
+  question: "iPhone 16 Pro 底部螺丝扭矩规格是多少"
+  item_name: "iPhone16Pro"
+  relevant_texts:
+    - "iPhone 16 Pro 底部螺丝扭矩规格"
+
+- query_id: ts_002
+  type: tech_spec
+  question: "iPad Pro 11 英寸屏幕工作电压是多少"
+  item_name: "iPadPro11"
+  relevant_texts:
+    - "iPad Pro 11 英寸屏幕工作电压"
+
+- query_id: ts_003
+  type: tech_spec
+  question: "MacBook Air M3 电池额定容量是多少毫安时"
+  item_name: "MacBookAirM3"
+  relevant_texts:
+    - "MacBook Air M3 电池额定容量"
+
+- query_id: ts_004
+  type: tech_spec
+  question: "Apple Watch Ultra 2 防水等级是多少米"
+  item_name: "AppleWatchUltra2"
+  relevant_texts:
+    - "Apple Watch Ultra 2 防水等级"
+
+- query_id: ts_005
+  type: tech_spec
+  question: "iPhone 15 的 USB-C 接口最大充电功率是多少瓦"
+  item_name: "iPhone15"
+  relevant_texts:
+    - "iPhone 15 USB-C 接口最大充电功率"
+
+- query_id: ts_006
+  type: tech_spec
+  question: "AirPods Pro 2 耳机本体重量是多少克"
+  item_name: "AirPodsPro2"
+  relevant_texts:
+    - "AirPods Pro 2 耳机本体重量"
+
+- query_id: ec_001
+  type: error_code
+  question: "故障码 E01 表示什么问题应该如何处理"
+  item_name: "iPhone16"
+  relevant_texts:
+    - "故障码 E01 电源适配器异常"
+
+- query_id: ec_002
+  type: error_code
+  question: "错误代码 F20002 是什么含义"
+  item_name: "MacBookPro"
+  relevant_texts:
+    - "错误代码 F20002 主板电源管理芯片故障"
+
+- query_id: ec_003
+  type: error_code
+  question: "iPad 出现错误码 N71 怎么排查"
+  item_name: "iPadPro11"
+  relevant_texts:
+    - "错误码 N71 基带通信异常"
+
+- query_id: ec_004
+  type: error_code
+  question: "Apple Watch 报错 E500 是什么原因"
+  item_name: "AppleWatchUltra2"
+  relevant_texts:
+    - "E500 加速度传感器通信失败"
+
+- query_id: ec_005
+  type: error_code
+  question: "iPhone 14 显示错误码 4013 怎么解决"
+  item_name: "iPhone14"
+  relevant_texts:
+    - "错误码 4013 USB 恢复模式通信失败"
+
+- query_id: ec_006
+  type: error_code
+  question: "MacBook Air 报错 PPF003 是什么故障"
+  item_name: "MacBookAirM3"
+  relevant_texts:
+    - "PPF003 散热风扇转速异常"
+
+- query_id: is_001
+  type: item_specific
+  question: "iPhone 16 Pro 的充电口类型是什么"
+  item_name: "iPhone16Pro"
+  relevant_texts:
+    - "iPhone 16 Pro 充电口类型 USB-C"
+
+- query_id: is_002
+  type: item_specific
+  question: "iPad Pro 11 英寸用的是哪款处理器"
+  item_name: "iPadPro11"
+  relevant_texts:
+    - "iPad Pro 11 英寸搭载 M4 芯片"
+
+- query_id: is_003
+  type: item_specific
+  question: "MacBook Air M3 有几个雷雳端口"
+  item_name: "MacBookAirM3"
+  relevant_texts:
+    - "MacBook Air M3 雷雳端口数量"
+
+- query_id: is_004
+  type: item_specific
+  question: "Apple Watch Ultra 2 表壳材质是什么"
+  item_name: "AppleWatchUltra2"
+  relevant_texts:
+    - "Apple Watch Ultra 2 表壳材质钛金属"
+
+- query_id: is_005
+  type: item_specific
+  question: "iPhone 15 Pro Max 屏幕尺寸是多少英寸"
+  item_name: "iPhone15ProMax"
+  relevant_texts:
+    - "iPhone 15 Pro Max 屏幕尺寸 6.7 英寸"
+
+- query_id: is_006
+  type: item_specific
+  question: "AirPods Pro 2 充电盒支持哪种无线充电标准"
+  item_name: "AirPodsPro2"
+  relevant_texts:
+    - "AirPods Pro 2 充电盒支持 MagSafe 和 Qi 无线充电"
+
+- query_id: gc_001
+  type: generic_context
+  question: "USB-C 和 Lightning 接口有什么区别"
+  item_name: null
+  relevant_texts:
+    - "USB-C 与 Lightning 接口区别"
+
+- query_id: gc_002
+  type: generic_context
+  question: "MagSafe 磁吸充电的工作原理是什么"
+  item_name: null
+  relevant_texts:
+    - "MagSafe 磁吸充电工作原理"
+
+- query_id: gc_003
+  type: generic_context
+  question: "OLED 屏幕和 LCD 屏幕的主要差异"
+  item_name: null
+  relevant_texts:
+    - "OLED 与 LCD 屏幕差异"
+
+- query_id: gc_004
+  type: generic_context
+  question: "什么是 DFU 模式如何进入"
+  item_name: null
+  relevant_texts:
+    - "DFU 模式进入方法"
+
+- query_id: gc_005
+  type: generic_context
+  question: "iPhone 进水后的正确处理步骤"
+  item_name: null
+  relevant_texts:
+    - "iPhone 进水紧急处理步骤"
+
+- query_id: gc_006
+  type: generic_context
+  question: "硅脂在笔记本散热中起什么作用"
+  item_name: null
+  relevant_texts:
+    - "硅脂散热原理与作用"
