@@ -49,6 +49,19 @@ class TestEnsureCollection:
 
         mock_client.create_collection.assert_not_called()
 
+    def test_loads_collection_after_create(self, mock_client):
+        """创建 collection 后应 load 到内存, 否则 search 报 not loaded."""
+        from apps.backend.services import milvus_client as mod
+
+        mod._client = mock_client
+        mock_client.has_collection.return_value = False
+
+        mod.ensure_collection()
+
+        mock_client.create_collection.assert_called_once()
+        mock_client.create_index.assert_called()
+        mock_client.load_collection.assert_called_once()
+
 
 @pytest.mark.unit
 class TestBulkUpsert:
@@ -96,6 +109,39 @@ class TestBulkUpsert:
         mod.bulk_upsert([])
 
         mock_client.insert.assert_not_called()
+
+    def test_sparse_vector_not_wrapped_in_list(self, mock_client):
+        """sparse_vector 应为 {idx: val} dict, 不是 [{idx: val}] 列表.
+
+        Bug: _to_sparse_payload 之前错误地将 dict 包装成 list,
+        导致 Milvus insert() 报 'invalid input for sparse float vector'.
+        """
+        from apps.backend.services import milvus_client as mod
+
+        mod._client = mock_client
+        vectors = [
+            {
+                "text": "chunk1",
+                "item_name": "Device",
+                "doc_name": "doc.pdf",
+                "chunk_id": 0,
+                "dense_vector": [0.1] * 1024,
+                "sparse_vector": {1: 0.5, 99: 0.3},
+            },
+        ]
+
+        mod.bulk_upsert(vectors)
+
+        mock_client.insert.assert_called_once()
+        rows = mock_client.insert.call_args[0][1]
+        sparse = rows[0]["sparse_vector"]
+        # 必须是 dict, 不能是 list
+        assert isinstance(sparse, dict), f"sparse_vector 应为 dict, 得到 {type(sparse).__name__}"
+        assert sparse == {1: 0.5, 99: 0.3}
+        # 确认 key 是 int, value 是 float
+        for k, v in sparse.items():
+            assert isinstance(k, int)
+            assert isinstance(v, float)
 
 
 @pytest.mark.unit
@@ -175,3 +221,32 @@ class TestHybridSearch:
         assert results[0]["text"] == "chunk1"
         assert results[0]["score"] == 0.95
         assert results[0]["item_name"] == "iPhone16"
+
+
+@pytest.mark.unit
+class TestDeleteByDocName:
+    def test_delete_calls_milvus_with_correct_filter(self, mock_client):
+        """delete_by_doc_name 应使用 doc_name == \"...\" filter."""
+        from apps.backend.services import milvus_client as mod
+
+        mod._client = mock_client
+        mock_client.delete.return_value = {"delete_count": 42}
+
+        count = mod.delete_by_doc_name("test.pdf")
+
+        mock_client.delete.assert_called_once()
+        call_args = mock_client.delete.call_args
+        assert call_args[0][0] == "zgzk"  # collection name
+        assert call_args[1]["filter"] == 'doc_name == "test.pdf"'
+        assert count == 42
+
+    def test_delete_returns_zero_when_no_match(self, mock_client):
+        """Milvus 返回 delete_count=0 时应返回 0."""
+        from apps.backend.services import milvus_client as mod
+
+        mod._client = mock_client
+        mock_client.delete.return_value = {"delete_count": 0}
+
+        count = mod.delete_by_doc_name("nonexistent.pdf")
+
+        assert count == 0

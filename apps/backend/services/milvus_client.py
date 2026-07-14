@@ -24,7 +24,7 @@ def _collection_name() -> str:
 
 
 def ensure_collection() -> None:
-    """创建 collection (含 schema + 索引), 已存在则跳过."""
+    """创建 collection (含 schema + 索引), 已存在则跳过. 创建后 load 到内存."""
     client = _get_client()
     name = _collection_name()
     if client.has_collection(name):
@@ -46,6 +46,9 @@ def ensure_collection() -> None:
     index_params.add_index("sparse_vector", index_type="SPARSE_INVERTED_INDEX", metric_type="IP", params={"drop_ratio_build": 0.2})
     client.create_index(name, index_params=index_params)
 
+    # 创建后 load 到内存, 否则 hybrid_search 报 collection not loaded
+    client.load_collection(name)
+
 
 def bulk_upsert(vectors: list[dict]) -> None:
     """批量写入 Milvus.
@@ -64,14 +67,10 @@ def bulk_upsert(vectors: list[dict]) -> None:
     client.insert(_collection_name(), rows)
 
 
-def _to_sparse_payload(sparse: dict) -> list[dict]:
-    """把 {idx: val} 转成 Milvus 接受的 sparse vector payload."""
-    return [{int(k): float(v)} for k, v in sparse.items()]
-
-
 def _normalize_row(v: dict) -> dict:
     sparse = v.get("sparse_vector", {})
-    sparse_payload = _to_sparse_payload(sparse) if isinstance(sparse, dict) else sparse
+    # Milvus insert() 接受 {idx: val} 格式的 sparse vector (单个 dict)
+    sparse_payload = {int(k): float(val) for k, val in sparse.items()} if isinstance(sparse, dict) else sparse
     return {
         "text": v.get("text", ""),
         "item_name": v.get("item_name", ""),
@@ -80,6 +79,20 @@ def _normalize_row(v: dict) -> dict:
         "dense_vector": v.get("dense_vector", [0.0] * DENSE_DIM),
         "sparse_vector": sparse_payload,
     }
+
+
+def delete_by_doc_name(doc_name: str) -> int:
+    """按 doc_name 删除该文档所有 chunk.
+
+    Args:
+        doc_name: 文档名, 用于 filter expression
+
+    Returns:
+        删除的条数
+    """
+    client = _get_client()
+    result = client.delete(_collection_name(), filter=f'doc_name == "{doc_name}"')
+    return result.get("delete_count", 0)
 
 
 def hybrid_search(
