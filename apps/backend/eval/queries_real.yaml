@@ -1,0 +1,64 @@
+# RAG 检索评估 — 真实数据测试集
+#
+# 所有 query 的 relevant_texts 均直接取自 temp_data 真实文档的 chunk 文本片段.
+# 评估时 hybrid_search 返回 top-K, 命中 relevant_texts 中任一条即视为召回成功.
+#
+# 注意: 当前环境无 BGE-M3 模型, embedder fallback 到 _MockEmbedder (全零向量),
+# 因此本次评估主要用于验证链路完整性, 召回率数值不反映真实检索质量.
+
+---
+- query_id: real_ts_001
+  type: tech_spec
+  question: "HUAWEI MateStation S 如何强制关机"
+  item_name: "HUAWEI MateStation S"
+  relevant_texts:
+    - "长按电源键 10 秒以上，可强制关机"
+
+- query_id: real_ts_002
+  type: tech_spec
+  question: "万用表直流电压测量的最大输入是多少"
+  item_name: "万用表"
+  relevant_texts:
+    - "交/直流电压</td><td>直流/交流电压600V"
+
+- query_id: real_ts_003
+  type: tech_spec
+  question: "HAK180 烫金机的电源电压要求是多少"
+  item_name: "HAK180 烫金机"
+  relevant_texts:
+    - "AC 220 V-240 V 50/60 Hz 电源供电"
+
+- query_id: real_is_001
+  type: item_specific
+  question: "H3C LA2608 是什么设备"
+  item_name: "H3C LA2608"
+  relevant_texts:
+    - "H3C LA2608-GM/GU 室内无线网关"
+
+- query_id: real_is_002
+  type: item_specific
+  question: "HAK180 是什么设备?"
+  item_name: "HAK180 烫金机"
+  relevant_texts:
+    - "感谢您购买 HAK 180 烫金机"
+
+- query_id: real_gc_001
+  type: generic_context
+  question: "Hugging Face 是什么公司"
+  item_name: null
+  relevant_texts:
+    - "Hugging Face 是一家提供开源 AI 工具和平台的公司"
+
+- query_id: real_ec_001
+  type: error_code
+  question: "万用表显示 BAT 符号表示什么"
+  item_name: "万用表"
+  relevant_texts:
+    - "BAT 电池电量不足指示"
+
+- query_id: real_ec_002
+  type: error_code
+  question: "万用表显示 OL 应该怎么处理"
+  item_name: "万用表"
+  relevant_texts:
+    - "表明测量值超出所选档位，应改选更高档"

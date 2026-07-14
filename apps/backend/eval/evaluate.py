@@ -175,9 +175,11 @@ def main(argv: list[str] | None = None) -> None:
                         help="最多评估多少条 query (默认全部)")
     parser.add_argument("--output", type=str, default=None,
                         help="JSON 报告输出路径, 不传则只打印终端表")
+    parser.add_argument("--queries", type=str, default=None,
+                        help="自定义 queries YAML 路径 (默认 eval/queries.yaml)")
     args = parser.parse_args(argv)
 
-    queries = load_queries()
+    queries = load_queries(Path(args.queries) if args.queries else DEFAULT_QUERIES)
     if args.limit > 0:
         queries = queries[: args.limit]
     if not queries:

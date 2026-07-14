@@ -58,27 +58,28 @@ def _load_embedder():
     """单例加载 BGEM3FlagModel (真实模型).
 
     优先级:
-    1. 本地路径 /models/bge-m3 (Docker 挂载或开发环境)
+    1. 本地路径 BGE_MODEL_PATH 或 /models/bge-m3
     2. HuggingFace BAAI/bge-m3 (自动下载)
     3. 失败回落 _MockEmbedder, 避免 import 期即崩溃.
+
+    GPU 优先: 有 CUDA 时用 fp16 + GPU 加速; 无 CUDA 时 CPU.
     """
     try:
         from FlagEmbedding import BGEM3FlagModel
+        import torch as _torch
 
-        # 优先使用本地挂载的模型
         local_path = os.environ.get("BGE_MODEL_PATH", "/models/bge-m3")
         if os.path.isdir(local_path) and os.path.exists(os.path.join(local_path, "config.json")):
-            model = BGEM3FlagModel(local_path, use_fp16=False)
-            logger.info("BGE-M3 model loaded from local path: %s", local_path)
+            devices = "cuda:0" if _torch.cuda.is_available() else None
+            model = BGEM3FlagModel(local_path, use_fp16=True, devices=devices)
+            logger.info("BGE-M3 loaded from %s (device=%s)", local_path, devices or "cpu")
         else:
-            use_fp16 = True  # fp16 加速; CPU 上也能工作
-            model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=use_fp16)
-            logger.info("BGE-M3 model loaded (BAAI/bge-m3, fp16=%s)", use_fp16)
+            devices = "cuda:0" if _torch.cuda.is_available() else None
+            model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=True, devices=devices)
+            logger.info("BGE-M3 loaded (device=%s)", devices or "cpu")
         return model
-    except Exception as exc:  # ImportError / RuntimeError / OSError
-        logger.warning(
-            "BGE-M3 not available (%s); using _MockEmbedder fallback", exc
-        )
+    except Exception as exc:
+        logger.warning("BGE-M3 not available (%s); using _MockEmbedder fallback", exc)
         return _MockEmbedder()
 
 

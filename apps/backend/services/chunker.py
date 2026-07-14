@@ -38,6 +38,15 @@ def chunk_by_section(
             sections.append((m.start(), m.group(0), m.end()))
 
     if not sections:
+        # Auto-fallback: 指定深度无标题时, 尝试 level-1 (#) 标题.
+        # MinerU 输出的 markdown 常见全 # 一级标题, 需此兜底避免退化成单块.
+        if header_level > 1:
+            for m in _HEADER_RE.finditer(markdown):
+                level = len(m.group(1))
+                if level == 1:
+                    sections.append((m.start(), m.group(0), m.end()))
+
+    if not sections:
         # 没有可读标题, 作为一整块返回
         return [{"text": _with_tag(tag, markdown), "chunk_id": 0, "item_name": item_name}]
 
