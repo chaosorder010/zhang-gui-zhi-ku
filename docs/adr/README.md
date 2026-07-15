@@ -9,6 +9,7 @@
 | ADR-003 | Graph RAG 编排 (recognize→retrieve→chatbot) | 已接受 | 2026-07-13 |
 | ADR-004 | HyDE / Rerank 双开关图编排 | 已接受 | 2026-07-15 |
 | ADR-005 | 并行开发的 Git Worktree 隔离 | 已接受 | 2026-07-15 |
+| ADR-006 | 前后端全栈 E2E 集成测试策略 | 已接受 (暂未实现) | 2026-07-15 |
 
 ---
 
