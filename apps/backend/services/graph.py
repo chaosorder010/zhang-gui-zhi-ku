@@ -6,10 +6,12 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
+from apps.backend.core.config import get_settings
 from apps.backend.services.llm import build_llm
 from apps.backend.services.recognizer import recognize_item
 from apps.backend.services.embedder import embed_chunks
 from apps.backend.services.milvus_client import hybrid_search
+from apps.backend.services.retriever import rrf_fuse
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +32,16 @@ class RagState(TypedDict):
     retrieved_chunks: list[dict]
 
 
-def build_graph(llm=None, embed_fn=None, search_fn=None):
-    """构造 LangGraph 三节点编排: recognize → retrieve → chatbot.
+def build_graph(llm=None, embed_fn=None, search_fn=None, enable_hyde: bool | None = None):
+    """构造 LangGraph 编排: recognize → [hyde →] retrieve → chatbot.
 
     Args:
         llm: LLM 实例, 默认 build_llm(); 可注入 mock 用于测试
         embed_fn: (query_str) -> {dense_vector, sparse_vector}, 默认 embed_chunks
         search_fn: (dense, sparse, item_name) -> list[dict], 默认 hybrid_search
+        enable_hyde: 是否启用 HyDE 节点. None 时读取 settings.enable_hyde.
+            True 时插入 hyde 节点 (recognize→hyde→chatbot, 跳过 retrieve);
+            False 时图结构字节级不变.
 
     Returns:
         编译后的 LangGraph (带 MemorySaver checkpointer)
@@ -47,6 +52,8 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
         embed_fn = _default_embed
     if search_fn is None:
         search_fn = hybrid_search
+    if enable_hyde is None:
+        enable_hyde = get_settings().enable_hyde
 
     memory = MemorySaver()
 
@@ -78,6 +85,37 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
         )
         logger.info("[rag] retrieve hits=%d item_name=%s", len(chunks), state["item_name"])
         return {"retrieved_chunks": chunks}
+
+    # ── Node 2b: HyDE 检索 (enable_hyde=True 时启用) ──
+    def hyde(state: RagState):
+        """HyDE: LLM 生成假设答案 → embed → hybrid_search → RRF 融合."""
+        last_q = _last_human_message(state["messages"])
+        if last_q is None:
+            return {"retrieved_chunks": []}
+        # 1. LLM 生成假设答案
+        prompt = get_settings().hyde_prompt_template.format(question=last_q)
+        # llm 从闭包拿, invoke 接收单字符串 prompt (LangChain 包装为 HumanMessage)
+        hypothetical = llm.invoke(prompt).content.strip()
+
+        # 2. embed 假设答案 + 原始 query
+        hyp_vec = embed_fn(hypothetical)
+        orig_vec = embed_fn(last_q)
+
+        # 3. 双路 hybrid_search
+        hyp_hits = search_fn(
+            hyp_vec["dense_vector"], hyp_vec["sparse_vector"], state.get("item_name")
+        )
+        orig_hits = search_fn(
+            orig_vec["dense_vector"], orig_vec["sparse_vector"], state.get("item_name")
+        )
+
+        # 4. 护栏: HyDE 命中 0 退回原始
+        if not hyp_hits:
+            return {"retrieved_chunks": orig_hits}
+
+        # 5. RRF 融合
+        fused = rrf_fuse([orig_hits, hyp_hits])
+        return {"retrieved_chunks": fused}
 
     # ── Node 3: 生成回答 ──
     def chatbot(state: RagState):
@@ -118,13 +156,28 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
     graph.add_node("chatbot", chatbot)
     graph.add_node("no_results", no_results)
 
+    if enable_hyde:
+        graph.add_node("hyde", hyde)
+
     graph.add_edge(START, "recognize")
-    graph.add_edge("recognize", "retrieve")
-    graph.add_conditional_edges(
-        "retrieve",
-        route_after_retrieve,
-        {"no_results": "no_results", "chatbot": "chatbot"},
-    )
+
+    if enable_hyde:
+        # recognize → hyde → (空结果分流 | chatbot), 跳过 retrieve
+        graph.add_edge("recognize", "hyde")
+        graph.add_conditional_edges(
+            "hyde",
+            route_after_retrieve,
+            {"no_results": "no_results", "chatbot": "chatbot"},
+        )
+    else:
+        # 原始路径: recognize → retrieve → (空结果分流 | chatbot)
+        graph.add_edge("recognize", "retrieve")
+        graph.add_conditional_edges(
+            "retrieve",
+            route_after_retrieve,
+            {"no_results": "no_results", "chatbot": "chatbot"},
+        )
+
     graph.add_edge("no_results", END)
     graph.add_edge("chatbot", END)
 
