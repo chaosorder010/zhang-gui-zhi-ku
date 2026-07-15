@@ -28,8 +28,8 @@
 | 删除文档 | ❌ | DELETE /api/documents/{id} |
 | 批量上传 | ❌ | 一次多个 PDF |
 | 前端进度条 | ❌ | WebSocket 或 polling |
-| HyDE 检索 | ❌ | 评估数据显示需要后 |
-| Rerank 精排 | ✅ | lift: eval 后补充 |
+| HyDE 检索 | ✅ | 3b507b1 |
+| Rerank 精排 | ✅ | dd64654 |
 | 检索日志看板 | ❌ | 命中率/延迟统计 |
 | 用户反馈 (赞/踩) | ❌ | 质量回馈 |
 

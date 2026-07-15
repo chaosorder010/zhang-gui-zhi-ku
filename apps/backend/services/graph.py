@@ -12,6 +12,7 @@ from apps.backend.services.recognizer import recognize_item
 from apps.backend.services.embedder import embed_chunks
 from apps.backend.services.milvus_client import hybrid_search
 from apps.backend.services.reranker import rerank_chunks
+from apps.backend.services.retriever import rrf_fuse
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +33,27 @@ class RagState(TypedDict):
     retrieved_chunks: list[dict]
 
 
-def build_graph(llm=None, embed_fn=None, search_fn=None, enable_rerank: bool | None = None):
-    """构造 LangGraph 编排: recognize → retrieve → [rerank] → chatbot.
+def build_graph(
+    llm=None,
+    embed_fn=None,
+    search_fn=None,
+    enable_hyde: bool | None = None,
+    enable_rerank: bool | None = None,
+):
+    """构造 LangGraph 编排: recognize → [hyde | retrieve] → [rerank] → chatbot.
+
+    两个开关独立控制, 关闭时图结构字节级不变.
 
     Args:
         llm: LLM 实例, 默认 build_llm(); 可注入 mock 用于测试
         embed_fn: (query_str) -> {dense_vector, sparse_vector}, 默认 embed_chunks
         search_fn: (dense, sparse, item_name) -> list[dict], 默认 hybrid_search
-        enable_rerank: 是否启用 rerank 精排, 默认取 settings.enable_rerank
+        enable_hyde: 是否启用 HyDE 节点. None 时读取 settings.enable_hyde.
+            True 时插入 hyde 节点 (recognize→hyde, 跳过 retrieve);
+            False 时走原始 retrieve 路径.
+        enable_rerank: 是否启用 rerank 精排, 默认取 settings.enable_rerank.
+            True 时在检索后插入 rerank 节点;
+            False 时图结构不变.
 
     Returns:
         编译后的 LangGraph (带 MemorySaver checkpointer)
@@ -50,6 +64,8 @@ def build_graph(llm=None, embed_fn=None, search_fn=None, enable_rerank: bool | N
         embed_fn = _default_embed
     if search_fn is None:
         search_fn = hybrid_search
+    if enable_hyde is None:
+        enable_hyde = get_settings().enable_hyde
     if enable_rerank is None:
         enable_rerank = get_settings().enable_rerank
 
@@ -83,6 +99,36 @@ def build_graph(llm=None, embed_fn=None, search_fn=None, enable_rerank: bool | N
         )
         logger.info("[rag] retrieve hits=%d item_name=%s", len(chunks), state["item_name"])
         return {"retrieved_chunks": chunks}
+
+    # ── Node 2b: HyDE 检索 (enable_hyde=True 时启用) ──
+    def hyde(state: RagState):
+        """HyDE: LLM 生成假设答案 → embed → hybrid_search → RRF 融合."""
+        last_q = _last_human_message(state["messages"])
+        if last_q is None:
+            return {"retrieved_chunks": []}
+        # 1. LLM 生成假设答案
+        prompt = get_settings().hyde_prompt_template.format(question=last_q)
+        hypothetical = llm.invoke(prompt).content.strip()
+
+        # 2. embed 假设答案 + 原始 query
+        hyp_vec = embed_fn(hypothetical)
+        orig_vec = embed_fn(last_q)
+
+        # 3. 双路 hybrid_search
+        hyp_hits = search_fn(
+            hyp_vec["dense_vector"], hyp_vec["sparse_vector"], state.get("item_name")
+        )
+        orig_hits = search_fn(
+            orig_vec["dense_vector"], orig_vec["sparse_vector"], state.get("item_name")
+        )
+
+        # 4. 护栏: HyDE 命中 0 退回原始
+        if not hyp_hits:
+            return {"retrieved_chunks": orig_hits}
+
+        # 5. RRF 融合
+        fused = rrf_fuse([orig_hits, hyp_hits])
+        return {"retrieved_chunks": fused}
 
     # ── Node 3: 生成回答 ──
     def chatbot(state: RagState):
@@ -138,22 +184,31 @@ def build_graph(llm=None, embed_fn=None, search_fn=None, enable_rerank: bool | N
     graph.add_node("chatbot", chatbot)
     graph.add_node("no_results", no_results)
 
-    # 仅在 enable_rerank=true 时加入 rerank 节点, 保证 false 时图结构不变
+    # 条件节点
+    if enable_hyde:
+        graph.add_node("hyde", hyde)
     if enable_rerank:
         graph.add_node("rerank", rerank)
 
     graph.add_edge(START, "recognize")
-    graph.add_edge("recognize", "retrieve")
 
-    # 条件边路径映射: 启用 rerank 时走 rerank 节点, 否则直接到 chatbot
+    # recognize → hyde 或 retrieve
+    if enable_hyde:
+        graph.add_edge("recognize", "hyde")
+    else:
+        graph.add_edge("recognize", "retrieve")
+
+    # 检索后路由 (从 hyde 或 retrieve 出发)
+    post_retrieve_node = "hyde" if enable_hyde else "retrieve"
     retrieve_paths = {"no_results": "no_results", "chatbot": "chatbot"}
     if enable_rerank:
         retrieve_paths["rerank"] = "rerank"
     graph.add_conditional_edges(
-        "retrieve",
+        post_retrieve_node,
         route_after_retrieve,
         retrieve_paths,
     )
+
     graph.add_edge("no_results", END)
     graph.add_edge("chatbot", END)
 
