@@ -88,15 +88,20 @@ def build_graph(
         last_human = _last_human_message(state["messages"])
         if last_human is None:
             return {"retrieved_chunks": []}
-        # embed_fn 接收原始 query text
-        vec = embed_fn(last_human)
-        # search_fn 接口: (dense, sparse, item_name) -> list[dict]
-        # 真实 hybrid_search 使用位置参数, mock 也兼容位置参数调用
-        chunks = search_fn(
-            vec["dense_vector"],
-            vec["sparse_vector"],
-            state["item_name"],
-        )
+        try:
+            # embed_fn 接收原始 query text
+            vec = embed_fn(last_human)
+            # search_fn 接口: (dense, sparse, item_name) -> list[dict]
+            # 真实 hybrid_search 使用位置参数, mock 也兼容位置参数调用
+            chunks = search_fn(
+                vec["dense_vector"],
+                vec["sparse_vector"],
+                state["item_name"],
+            )
+        except Exception as e:
+            # 护栏: Milvus 异常 (collection 不存在/网络抖动) → 退回空结果,走空结果兜底
+            logger.warning("[rag] retrieve failed, falling back to empty: %s", e)
+            return {"retrieved_chunks": []}
         logger.info("[rag] retrieve hits=%d item_name=%s", len(chunks), state["item_name"])
         return {"retrieved_chunks": chunks}
 
@@ -114,13 +119,17 @@ def build_graph(
         hyp_vec = embed_fn(hypothetical)
         orig_vec = embed_fn(last_q)
 
-        # 3. 双路 hybrid_search
-        hyp_hits = search_fn(
-            hyp_vec["dense_vector"], hyp_vec["sparse_vector"], state.get("item_name")
-        )
-        orig_hits = search_fn(
-            orig_vec["dense_vector"], orig_vec["sparse_vector"], state.get("item_name")
-        )
+        # 3. 双路 hybrid_search (护栏: Milvus 异常退回空 → 走兜底)
+        try:
+            hyp_hits = search_fn(
+                hyp_vec["dense_vector"], hyp_vec["sparse_vector"], state.get("item_name")
+            )
+            orig_hits = search_fn(
+                orig_vec["dense_vector"], orig_vec["sparse_vector"], state.get("item_name")
+            )
+        except Exception as e:
+            logger.warning("[rag] hyde search failed, falling back to empty: %s", e)
+            return {"retrieved_chunks": []}
 
         # 4. 护栏: HyDE 命中 0 退回原始
         if not hyp_hits:

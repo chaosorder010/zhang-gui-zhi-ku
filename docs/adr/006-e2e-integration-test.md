@@ -1,6 +1,6 @@
 # ADR-006: 前后端全栈 E2E 集成测试策略
 
-> 状态: 已接受 (暂未实现)
+> 状态: 已接受 — 已实现 (scripts/run_e2e.py, commit TBD)
 > 日期: 2026-07-15
 > 决策者: 开发团队
 > 相关: ADR-005 (worktree 隔离), docs/e2e-test-report.md (已有手工测试报告)
@@ -67,11 +67,32 @@ run_e2e.py
 
 ---
 
+## 实现记录
+
+- 脚本位置: `scripts/run_e2e.py` (12 个场景,httpx + subprocess)
+- 一次运行耗时 ~2 分钟 (主要是 Milvus 冷启动 + ask 链路 LLM 延迟)
+- 2026-07-15 首次全通过 (12/12)
+
+### 实现中的调整 (vs ADR 原始设计)
+
+| ADR 原始 | 实际 | 原因 |
+|---|---|---|---|---|
+| `docker compose up -d --build` | `up -d` (无 --build) | Docker Hub 在国内超时,镜像本地已有 |
+| backend 映射 host 8000 | 仅 `expose`(容器间) | host 8000 被 WSL 某进程占,且 e2e 走 nginx 5173 不需要 host 端口 |
+| 不挂代码 volume | `./apps/backend:/app/apps/backend:ro` | 无 --build 则必须挂载才能加载新代码 |
+
+### 测试发现的真实 bug (已修复)
+
+1. **`retrieve` 节点无 Milvus 异常处理** — collection 不存在时 500。已加 try/except 退回空结果走兜底
+2. **`delete_by_doc_name` 同上** — 修复 + 加 logger (原文件漏 import logging)
+3. **`hyde` 节点同样风险** — 一并修复
+
 ## 未决策 / 后续
 
 - CI 集成 (GitHub Actions) 推迟 — 脚本先稳定
 - HyDE/Rerank 开关的前端 UI — 不在本次范围
 - 真实 eval 数字对比 (Recall@5 / MRR@5 lift) — 单独任务
+- 让 `docker compose down -v` 可选 (保留 dev Milvus 数据) 或每次重建
 
 ---
 

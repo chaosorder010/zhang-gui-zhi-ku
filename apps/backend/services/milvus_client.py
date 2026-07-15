@@ -1,8 +1,12 @@
 """Milvus 操作 wrapper (pymilvus 3.0.0 MilvusClient 新 API)."""
 from __future__ import annotations
 
+import logging
+
 from pymilvus import MilvusClient, DataType, AnnSearchRequest, WeightedRanker
 from apps.backend.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 DENSE_DIM = 1024
 
@@ -88,11 +92,15 @@ def delete_by_doc_name(doc_name: str) -> int:
         doc_name: 文档名, 用于 filter expression
 
     Returns:
-        删除的条数
+        删除的条数 (collection 不存在时返回 0)
     """
-    client = _get_client()
-    result = client.delete(_collection_name(), filter=f'doc_name == "{doc_name}"')
-    return result.get("delete_count", 0)
+    try:
+        client = _get_client()
+        result = client.delete(_collection_name(), filter=f'doc_name == "{doc_name}"')
+        return result.get("delete_count", 0)
+    except Exception as e:
+        logger.warning("[milvus] delete_by_doc_name failed (collection may not exist): %s", e)
+        return 0
 
 
 def hybrid_search(
