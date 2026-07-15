@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # History
     history_max_turns: int = 10
 
+    # Rerank
+    enable_rerank: bool = False
 
 @lru_cache
 def get_settings() -> Settings:

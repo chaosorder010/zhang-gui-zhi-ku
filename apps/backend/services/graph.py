@@ -6,10 +6,12 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
+from apps.backend.core.config import get_settings
 from apps.backend.services.llm import build_llm
 from apps.backend.services.recognizer import recognize_item
 from apps.backend.services.embedder import embed_chunks
 from apps.backend.services.milvus_client import hybrid_search
+from apps.backend.services.reranker import rerank_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +32,14 @@ class RagState(TypedDict):
     retrieved_chunks: list[dict]
 
 
-def build_graph(llm=None, embed_fn=None, search_fn=None):
-    """构造 LangGraph 三节点编排: recognize → retrieve → chatbot.
+def build_graph(llm=None, embed_fn=None, search_fn=None, enable_rerank: bool | None = None):
+    """构造 LangGraph 编排: recognize → retrieve → [rerank] → chatbot.
 
     Args:
         llm: LLM 实例, 默认 build_llm(); 可注入 mock 用于测试
         embed_fn: (query_str) -> {dense_vector, sparse_vector}, 默认 embed_chunks
         search_fn: (dense, sparse, item_name) -> list[dict], 默认 hybrid_search
+        enable_rerank: 是否启用 rerank 精排, 默认取 settings.enable_rerank
 
     Returns:
         编译后的 LangGraph (带 MemorySaver checkpointer)
@@ -47,6 +50,8 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
         embed_fn = _default_embed
     if search_fn is None:
         search_fn = hybrid_search
+    if enable_rerank is None:
+        enable_rerank = get_settings().enable_rerank
 
     memory = MemorySaver()
 
@@ -105,11 +110,26 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
         if not state["retrieved_chunks"]:
             logger.info("[rag] route → no_results (empty hits)")
             return "no_results"
+        if enable_rerank:
+            return "rerank"
         return "chatbot"
 
     # ── 空结果节点 ──
     def no_results(state: RagState):
         return {"messages": [AIMessage(content=_NO_INFO_MESSAGE)]}
+
+    # ── Rerank 节点 (开关行为, enable_rerank=false 时不加入图) ──
+    def rerank(state: RagState):
+        """LLM 精排: 对 retrieved_chunks 按相关性重排序.
+
+        护栏: rerank_chunks 内部已处理异常, 失败时退回原始 Milvus 顺序.
+        """
+        last_human = _last_human_message(state["messages"])
+        if last_human is None:
+            return {}
+        reranked = rerank_chunks(state["retrieved_chunks"], last_human, llm)
+        logger.info("[rag] rerank reordered %d chunks", len(reranked))
+        return {"retrieved_chunks": reranked}
 
     # ── 构建图 ──
     graph = StateGraph(RagState)
@@ -118,15 +138,27 @@ def build_graph(llm=None, embed_fn=None, search_fn=None):
     graph.add_node("chatbot", chatbot)
     graph.add_node("no_results", no_results)
 
+    # 仅在 enable_rerank=true 时加入 rerank 节点, 保证 false 时图结构不变
+    if enable_rerank:
+        graph.add_node("rerank", rerank)
+
     graph.add_edge(START, "recognize")
     graph.add_edge("recognize", "retrieve")
+
+    # 条件边路径映射: 启用 rerank 时走 rerank 节点, 否则直接到 chatbot
+    retrieve_paths = {"no_results": "no_results", "chatbot": "chatbot"}
+    if enable_rerank:
+        retrieve_paths["rerank"] = "rerank"
     graph.add_conditional_edges(
         "retrieve",
         route_after_retrieve,
-        {"no_results": "no_results", "chatbot": "chatbot"},
+        retrieve_paths,
     )
     graph.add_edge("no_results", END)
     graph.add_edge("chatbot", END)
+
+    if enable_rerank:
+        graph.add_edge("rerank", "chatbot")
 
     return graph.compile(checkpointer=memory)
 
