@@ -58,6 +58,7 @@ def evaluate_all(
     queries: list[dict],
     milvus_module=milvus_client,
     limit: int = 10,
+    rerank_fn=None,
 ) -> list[dict]:
     """对每条 query 跑 hybrid search 并计算指标.
 
@@ -65,6 +66,8 @@ def evaluate_all(
         queries: load_queries 返回的 query 列表
         milvus_module: 可注入 mock 的 milvus 模块 (真实或 unittest.mock)
         limit: top-K 上限 (至少 max(K_VALUES))
+        rerank_fn: 可选的 (hits, question) -> hits 精排函数.
+                  传入时, 计算指标前先用它对召回结果重排.
     """
     limit = max(limit, max(K_VALUES))
     results: list[dict] = []
@@ -78,6 +81,9 @@ def evaluate_all(
             item_name=q.get("item_name"),
             limit=limit,
         )
+
+        if rerank_fn is not None:
+            hits = rerank_fn(hits, question)
 
         relevant = set(q.get("relevant_texts") or [])
         row: dict = {
@@ -168,6 +174,47 @@ def render_table(report: dict) -> str:
     return "\n".join(lines)
 
 
+def _make_rerank_fn():
+    """构造 (hits, question) -> hits rerank 函数, 走 LLM 精排."""
+    from apps.backend.services.reranker import rerank_chunks
+    from apps.backend.services.llm import build_llm
+
+    llm = build_llm()
+
+    def _rerank(hits, question):
+        return rerank_chunks(hits, question, llm)
+
+    return _rerank
+
+
+def _compare_table(baseline: dict, reranked: dict) -> str:
+    """渲染 baseline vs rerank 对比表 (聚焦 MRR@K 变化)."""
+    metric_keys = [f"recall@{k}" for k in K_VALUES] + [f"mrr@{k}" for k in K_VALUES]
+    lines: list[str] = []
+    lines.append("")
+    lines.append("=" * 80)
+    lines.append("  Rerank Lift 对比 — baseline (Milvus) vs LLM-rerank")
+    lines.append("=" * 80)
+    header = f"  {'metric':<24} {'baseline':>12} {'rerank':>12} {'lift':>12}"
+    lines.append(header)
+    lines.append("  " + "-" * 76)
+
+    def _row(label: str, b_val: float, r_val: float, fmt: str = ".3f") -> str:
+        lift = r_val - b_val
+        sign = "+" if lift >= 0 else ""
+        return (
+            f"  {label:<24} {b_val:>12{fmt[1:]}} {r_val:>12{fmt[1:]}} "
+            f"{sign}{lift:>11{fmt[1:]}}"
+        )
+
+    for key in metric_keys:
+        b_val = baseline.get(key, 0.0)
+        r_val = reranked.get(key, 0.0)
+        lines.append(_row(f"overall.{key}", b_val, r_val))
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> None:
     """CLI 入口."""
     parser = argparse.ArgumentParser(description="RAG 检索评估框架")
@@ -177,6 +224,8 @@ def main(argv: list[str] | None = None) -> None:
                         help="JSON 报告输出路径, 不传则只打印终端表")
     parser.add_argument("--queries", type=str, default=None,
                         help="自定义 queries YAML 路径 (默认 eval/queries.yaml)")
+    parser.add_argument("--rerank", action="store_true",
+                        help="同时跑 baseline + LLM rerank, 比较 MRR 变化")
     args = parser.parse_args(argv)
 
     queries = load_queries(Path(args.queries) if args.queries else DEFAULT_QUERIES)
@@ -190,6 +239,13 @@ def main(argv: list[str] | None = None) -> None:
     report = build_report(results)
     table = render_table(report)
     print(table)
+
+    if args.rerank:
+        rerank_fn = _make_rerank_fn()
+        reranked_results = evaluate_all(queries, rerank_fn=rerank_fn)
+        reranked_report = build_report(reranked_results)
+        compare = _compare_table(report["overall"], reranked_report["overall"])
+        print(compare)
 
     if args.output:
         out_path = Path(args.output)
