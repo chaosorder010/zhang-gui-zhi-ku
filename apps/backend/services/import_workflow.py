@@ -182,8 +182,6 @@ def _node_extract(state: ImportState) -> dict:
     # 校验 MinerU 输出质量
     if not md or not md.strip():
         raise ValueError("MinerU 返回空内容")
-    if "##" not in md:
-        raise ValueError("无二级标题，无法分块")
     return {"markdown": md}
 
 

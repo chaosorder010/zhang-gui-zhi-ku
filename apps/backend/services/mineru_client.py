@@ -52,8 +52,15 @@ def apply_upload_url(
     if data.get("code") != 0:
         raise RuntimeError(f"申请上传链接失败: {data.get('msg', '未知错误')}")
 
-    task_id = data["data"]["task_id"]
-    file_urls = data["data"]["file_urls"]
+    task_id = data["data"]["batch_id"]
+    # file_urls 可能是 list[str] 或 list[{"data_id","url"}]
+    raw_urls = data["data"]["file_urls"]
+    file_urls = []
+    for item in raw_urls:
+        if isinstance(item, str):
+            file_urls.append({"data_id": "f1", "url": item})
+        else:
+            file_urls.append(item)
     return task_id, file_urls
 
 
@@ -78,13 +85,12 @@ def poll_result(
     Raises:
         RuntimeError: 失败 / 超时
     """
-    url = f"{base_url}/extract/result"
+    url = f"{base_url}/extract-results/batch/{task_id}"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         resp = requests.get(
             url,
             headers={"Authorization": f"Bearer {token}"},
-            params={"task_id": task_id},
             timeout=30,
         )
         if resp.status_code != 200:
@@ -93,7 +99,11 @@ def poll_result(
         if body.get("code") != 0:
             raise RuntimeError(f"轮询返回错误: {body.get('msg')}")
 
-        result = body.get("data", {}).get("extract_result", {})
+        # extract_result 是数组, 取第一个
+        results = body.get("data", {}).get("extract_result", [])
+        if not results:
+            raise RuntimeError("轮询返回空结果")
+        result = results[0]
         state = result.get("state", "unknown")
         if state == "done":
             return result
