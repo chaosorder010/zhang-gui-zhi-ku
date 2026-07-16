@@ -1,0 +1,8 @@
+# 基于已构建的 backend 镜像,叠加 CUDA torch
+# 避免重新拉取 python:3.13-slim (Docker Hub 超时)
+FROM zhang-gui-zhi-ku-backend:latest
+
+WORKDIR /app
+
+# 安装 CUDA torch (覆盖 CPU 版本)
+RUN uv pip install --index-url https://download.pytorch.org/whl/cu124 torch torchvision torchaudio
