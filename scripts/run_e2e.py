@@ -20,7 +20,7 @@ import httpx
 
 # --- 配置 ---
 COMPOSE_DIR = Path(__file__).resolve().parent.parent
-BASE_URL = "http://localhost:5173"
+BASE_URL = "http://localhost:5200"
 HTTP_TIMEOUT = 60.0          # 单个请求超时 (ask 链 LL M,留足余量)
 HEALTH_RETRY_SECONDS = 180.0 # 等 backend healthy 的总预算
 HEALTH_INTERVAL = 3.0

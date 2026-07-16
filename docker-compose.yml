@@ -28,7 +28,7 @@ services:
     image: nginx:alpine
     container_name: zgzk-frontend
     ports:
-      - "5173:80"
+      - "5200:80"  # 5173-5179 均被 local shared-thinking-space 占用,改用 5200
     volumes:
       - ./apps/frontend:/usr/share/nginx/html/static:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
