@@ -21,6 +21,11 @@ wheels/
 .DS_Store
 Thumbs.db
 
+# Tool config
+.claude/
+.pi/
+.warp/
+
 # Logs
 *.log
 logs/
