@@ -27,7 +27,7 @@ def patch_client(mock_client):
 @pytest.mark.unit
 class TestEnsureCollection:
     def test_creates_schema_when_not_exists(self, mock_client):
-        """collection 不存在时应创建 schema + 索引."""
+        """collection 不存在时应创建 schema + 索引 + 加载."""
         from apps.backend.services import milvus_client as mod
 
         mod._client = mock_client
@@ -37,9 +37,22 @@ class TestEnsureCollection:
 
         mock_client.create_collection.assert_called_once()
         mock_client.create_index.assert_called()
+        mock_client.load_collection.assert_called_once()
+
+    def test_loads_collection_when_exists(self, mock_client):
+        """collection 已存在时, 仍应加载到内存."""
+        from apps.backend.services import milvus_client as mod
+
+        mod._client = mock_client
+        mock_client.has_collection.return_value = True
+
+        mod.ensure_collection()
+
+        mock_client.create_collection.assert_not_called()
+        mock_client.load_collection.assert_called_once()
 
     def test_skips_when_exists(self, mock_client):
-        """collection 已存在时跳过创建."""
+        """collection 已存在时跳过创建 (但加载)."""
         from apps.backend.services import milvus_client as mod
 
         mod._client = mock_client

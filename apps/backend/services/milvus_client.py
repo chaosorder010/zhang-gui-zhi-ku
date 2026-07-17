@@ -31,24 +31,25 @@ def ensure_collection() -> None:
     """创建 collection (含 schema + 索引), 已存在则跳过. 创建后 load 到内存."""
     client = _get_client()
     name = _collection_name()
-    if client.has_collection(name):
-        return
+    if not client.has_collection(name):
+        schema = MilvusClient.create_schema(auto_id=True, enable_dynamic_field=False)
+        schema.add_field("id", DataType.INT64, is_primary=True, auto_id=True)
+        schema.add_field("dense_vector", DataType.FLOAT_VECTOR, dim=DENSE_DIM)
+        schema.add_field("sparse_vector", DataType.SPARSE_FLOAT_VECTOR)
+        schema.add_field("text", DataType.VARCHAR, max_length=65535)
+        schema.add_field("item_name", DataType.VARCHAR, max_length=256)
+        schema.add_field("doc_name", DataType.VARCHAR, max_length=1024)
+        schema.add_field("chunk_id", DataType.INT64)
 
-    schema = MilvusClient.create_schema(auto_id=True, enable_dynamic_field=False)
-    schema.add_field("id", DataType.INT64, is_primary=True, auto_id=True)
-    schema.add_field("dense_vector", DataType.FLOAT_VECTOR, dim=DENSE_DIM)
-    schema.add_field("sparse_vector", DataType.SPARSE_FLOAT_VECTOR)
-    schema.add_field("text", DataType.VARCHAR, max_length=65535)
-    schema.add_field("item_name", DataType.VARCHAR, max_length=256)
-    schema.add_field("doc_name", DataType.VARCHAR, max_length=1024)
-    schema.add_field("chunk_id", DataType.INT64)
+        client.create_collection(name, schema=schema)
 
-    client.create_collection(name, schema=schema)
+        index_params = MilvusClient.prepare_index_params()
+        index_params.add_index("dense_vector", index_type="IVF_FLAT", metric_type="L2", params={"nlist": 128})
+        index_params.add_index("sparse_vector", index_type="SPARSE_INVERTED_INDEX", metric_type="IP", params={"drop_ratio_build": 0.2})
+        client.create_index(name, index_params=index_params)
 
-    index_params = MilvusClient.prepare_index_params()
-    index_params.add_index("dense_vector", index_type="IVF_FLAT", metric_type="L2", params={"nlist": 128})
-    index_params.add_index("sparse_vector", index_type="SPARSE_INVERTED_INDEX", metric_type="IP", params={"drop_ratio_build": 0.2})
-    client.create_index(name, index_params=index_params)
+    # 确保集合加载到内存 (搜索前必须)
+    client.load_collection(name)
 
     # 创建后 load 到内存, 否则 hybrid_search 报 collection not loaded
     client.load_collection(name)
@@ -73,15 +74,14 @@ def bulk_upsert(vectors: list[dict]) -> None:
 
 def _normalize_row(v: dict) -> dict:
     sparse = v.get("sparse_vector", {})
-    # Milvus insert() 接受 {idx: val} 格式的 sparse vector (单个 dict)
-    sparse_payload = {int(k): float(val) for k, val in sparse.items()} if isinstance(sparse, dict) else sparse
+    # pymilvus 3.0 insert: sparse vector 直接传 {idx: weight}
     return {
         "text": v.get("text", ""),
         "item_name": v.get("item_name", ""),
         "doc_name": v.get("doc_name", ""),
         "chunk_id": v.get("chunk_id", 0),
         "dense_vector": v.get("dense_vector", [0.0] * DENSE_DIM),
-        "sparse_vector": sparse_payload,
+        "sparse_vector": sparse if isinstance(sparse, dict) else {},
     }
 
 
@@ -121,6 +121,7 @@ def hybrid_search(
         list of {text, item_name, score}
     """
     client = _get_client()
+    ensure_collection()
     collection = _collection_name()
     filt = f'item_name == "{item_name}"' if item_name else ""
 
